@@ -1,14 +1,10 @@
-from app.domains.danji.client import DanjiClient
-from app.domains.jira.client import JiraClient
-from app.domains.llm.client import LlmClient
-from app.domains.slack_notification.client import SlackClient
 from app.core.config import settings
-from app.domains.danji.service import DanjiService
+from app.domains.jira.client import JiraClient
 from app.domains.jira.service import JiraService
+from app.domains.llm.client import LlmClient
 from app.domains.llm.service import LlmService
+from app.domains.slack_notification.client import SlackClient
 from app.domains.slack_notification.service import SlackNotificationService
-from app.domains.ht_oauth.service import HtOauthService
-from app.domains.dj_oauth.service import DjOauthService
 from app.domains.ssh.service import SshService
 from app.core.session_manager import SessionManager
 from app.core.session_state import session_manager
@@ -27,20 +23,12 @@ def get_llm_client() -> LlmClient:
     )
 
 
-def get_danji_client() -> DanjiClient:
-    return DanjiClient(base_url=settings.danji_base_url)
-
-
 def get_slack_notification_service() -> SlackNotificationService:
     return SlackNotificationService(slack_client=get_slack_client())
 
 
 def get_llm_service() -> LlmService:
     return LlmService(llm_client=get_llm_client())
-
-
-def get_danji_service() -> DanjiService:
-    return DanjiService(danji_client=get_danji_client())
 
 
 def get_jira_client() -> JiraClient:
@@ -64,13 +52,6 @@ def get_jira_service() -> JiraService:
         customer_part_field_id=settings.jira_customer_part_field_id,
         req_type_field_id=settings.jira_req_type_field_id,
     )
-
-def get_ht_oauth_service() -> HtOauthService:
-    return HtOauthService()
-
-def get_dj_oauth_service() -> DjOauthService:
-    return DjOauthService()
-
 
 def get_ssh_service() -> SshService:
     return SshService()

@@ -38,7 +38,7 @@ class _JiraFsCreateTabState extends State<JiraFsCreateTab> {
   final List<JiraAttachment> _attachments = [];
 
   static const String _defaultCustomerPart = 'etc';
-  static const String _defaultReqType = '디버깅(점검)';
+  static const String _defaultReqType = 'Debugging (Inspection)';
 
   @override
   void initState() {
@@ -185,11 +185,11 @@ class _JiraFsCreateTabState extends State<JiraFsCreateTab> {
       return;
     }
     if (problem.length < 10) {
-      setState(() => _error = '문제 내용은 최소 10글자 이상 입력해주세요.');
+      setState(() => _error = 'Please enter at least 10 characters for the problem details.');
       return;
     }
     if (inspection.length < 10) {
-      setState(() => _error = '점검 내용은 최소 10글자 이상 입력해주세요.');
+      setState(() => _error = 'Please enter at least 10 characters for the inspection details.');
       return;
     }
     if (customerPart == null || customerPart.isEmpty) {
@@ -279,7 +279,7 @@ class _JiraFsCreateTabState extends State<JiraFsCreateTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const PageHelpBox(
-                    message: 'Jira FS 이슈 생성과 첨부 파일 업로드를 테스트할 수 있는 페이지입니다.',
+                    message: 'Use this page to test Jira FS issue creation and attachment uploads.',
                   ),
                   const SizedBox(height: 16),
                   const BsText(
@@ -330,15 +330,15 @@ class _JiraFsCreateTabState extends State<JiraFsCreateTab> {
                   BsTextField(
                     controller: _problemController,
                     maxLines: 4,
-                    label: '문제 내용',
-                    helperText: '장애 시점, 민원 접수 시점/세대 동호 등',
+                    label: 'Problem Details',
+                    helperText: 'Issue time, complaint received time, building/unit info, etc.',
                   ),
                   const SizedBox(height: 12),
                   BsTextField(
                     controller: _inspectionController,
                     maxLines: 4,
-                    label: '점검 내용',
-                    helperText: '물리/통신 점검 및 대응 내용, 재현 방법, 기타 확인 사항',
+                    label: 'Inspection Details',
+                    helperText: 'Physical/network checks, actions taken, repro steps, and notes.',
                   ),
                   const SizedBox(height: 12),
                   const BsText(

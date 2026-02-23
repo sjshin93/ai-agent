@@ -90,16 +90,6 @@ def substitute(text: str, params: dict[str, str], defaults: dict[str, str]) -> s
     return _VAR_PATTERN.sub(_replace, text)
 
 
-def resolve_framework_url_for_site(site_id: int) -> str | None:
-    ip = _resolve_danji_ip(site_id)
-    if not ip:
-        return None
-    scheme = settings.danji_framework_scheme.lower().strip()
-    if scheme not in {"http", "https"}:
-        scheme = "https"
-    return f"{scheme}://{ip}:{settings.danji_framework_port}"
-
-
 def extract_params(*values: str | None) -> list[str]:
     seen: set[str] = set()
     params: list[str] = []
@@ -128,60 +118,6 @@ def _resolve_collection_path(value: str) -> Path | None:
     return None
 
 
-def _resolve_danji_ip(site_id: int) -> str | None:
-    mapping = _load_danji_ip_map()
-    return mapping.get(site_id)
-
-
-def _resolve_danji_info_path(value: str) -> Path | None:
-    candidates: list[Path] = []
-    if value:
-        candidates.append(Path(value))
-    candidates.append(Path.cwd() / "info_danji.txt")
-    candidates.append(Path("/app/info_danji.txt"))
-    candidates.append(Path.cwd().parent / "info_danji.txt")
-    for candidate in candidates:
-        path = candidate.expanduser()
-        if path.is_file():
-            return path
-    return None
-
-
-def _load_danji_ip_map() -> dict[int, str]:
-    path = _resolve_danji_info_path(settings.danji_info_path)
-    if not path:
-        logger.warning("info_danji.txt not found; siteId IP mapping unavailable")
-        return {}
-    mapping: dict[int, str] = {}
-    try:
-        for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            line = raw.strip()
-            if not line or not line.startswith("id:"):
-                continue
-            fields: dict[str, str] = {}
-            for part in line.split("|"):
-                if ":" not in part:
-                    continue
-                key, value = part.split(":", 1)
-                fields[key.strip()] = value.strip()
-            site_raw = fields.get("id", "")
-            ip_raw = fields.get("ip", "")
-            if not site_raw or not ip_raw:
-                continue
-            ip_lower = ip_raw.lower()
-            if ip_lower in {"none", "null"}:
-                continue
-            try:
-                site_id = int(site_raw)
-            except ValueError:
-                continue
-            mapping[site_id] = ip_raw
-    except OSError as exc:
-        logger.exception("Failed to read info_danji.txt %s: %s", path, exc)
-        return {}
-    return mapping
-
-
 def _extract_collection_variables(data: dict) -> dict[str, str]:
     defaults: dict[str, str] = {}
     for item in data.get("variable", []) or []:
@@ -192,7 +128,6 @@ def _extract_collection_variables(data: dict) -> dict[str, str]:
     if settings.collection_base_url:
         defaults.setdefault("baseUrl", settings.collection_base_url)
         defaults.setdefault("base_url", settings.collection_base_url)
-    defaults.setdefault("bds-core-framework-url", "https://172.20.200.200:30001")
     return defaults
 
 

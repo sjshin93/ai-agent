@@ -14,7 +14,7 @@ class PageHelpBox extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const BsText('도움말', variant: BsTextVariant.subtitle),
+        const BsText('Help', variant: BsTextVariant.subtitle),
         const SizedBox(height: 8),
         BsAlert(
           message: message,

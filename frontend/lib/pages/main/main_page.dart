@@ -4,17 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../../routes.dart';
 import 'services/config_service.dart';
-import 'services/jira_service.dart';
 import 'services/llm_service.dart';
 import 'services/slack_notification_service.dart';
 import '../../services/session_service.dart';
 import 'services/ssh_service.dart';
-import '../../widgets/bs/bs_alert.dart';
 import '../../widgets/bs/bs_button.dart';
 import '../../widgets/bs/bs_card.dart';
-import '../../widgets/bs/bs_select.dart';
 import '../../widgets/bs/bs_text.dart';
-import '../../widgets/bs/bs_text_field.dart';
 import '../../widgets/page_help_box.dart';
 import '../../widgets/status_footer.dart';
 import 'api_test_tab.dart';
@@ -37,7 +33,7 @@ class _MainPageState extends State<MainPage>
   Timer? _countdownTimer;
   DateTime? _lastSessionTouchedAt;
   bool _isSessionTouching = false;
-  String _footerLabel = '기능 ?�스??;
+  String _footerLabel = 'Feature Test';
   String _footerTimestamp = _formatTimestamp(DateTime.now());
   Duration _idleTimeout = const Duration(minutes: 5);
   int _remainingSeconds = 300;
@@ -138,7 +134,6 @@ class _MainPageState extends State<MainPage>
     }
     SessionService.setUsername(null);
     SessionService.setAccessToken(null);
-    SessionService.setDjAccessToken(null);
     Navigator.of(context).pushNamedAndRemoveUntil(
       AppRoutes.login,
       (route) => false,
@@ -398,7 +393,7 @@ class _StatusDashboard extends StatelessWidget {
           child: Column(
             children: [
               const PageHelpBox(
-                message: '???�이지?�서 ?�공?�는 기능???�상 ?�작중인지 ?�인?????�는 ?�이지?�니??',
+                message: 'This page lets you verify that the main features are working as expected.',
               ),
               const SizedBox(height: 16),
               const BsText(
@@ -424,13 +419,13 @@ class _StatusDashboard extends StatelessWidget {
                     onPressed: onSlackTest,
                   ),
                   _StatusCard(
-                    title: 'Danji Server SSH',
+                    title: 'Target Server SSH',
                     value: 'Run top once',
                     actionLabel: 'Fetch top',
                     onPressed: onSshTop,
                   ),
                   _StatusCard(
-                    title: 'Danji Server SSH',
+                    title: 'Target Server SSH',
                     value: 'Run free -m',
                     actionLabel: 'Fetch free',
                     onPressed: onSshFree,
@@ -438,240 +433,6 @@ class _StatusDashboard extends StatelessWidget {
                 ],
               ),
               // Jira issue panel removed from TEST PAGE.
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class JiraIssuePanel extends StatefulWidget {
-  const JiraIssuePanel({super.key, required this.client});
-
-  final JiraService client;
-
-  @override
-  State<JiraIssuePanel> createState() => _JiraIssuePanelState();
-}
-
-class _JiraIssuePanelState extends State<JiraIssuePanel> {
-  final _titleController = TextEditingController();
-  final _problemController = TextEditingController();
-  final _inspectionController = TextEditingController();
-  bool _isSubmitting = false;
-  bool _isLoadingOptions = true;
-  String? _error;
-  List<String> _customerParts = [];
-  List<String> _reqTypes = [];
-  String? _selectedCustomerPart;
-  String? _selectedReqType;
-
-  static const String _defaultCustomerPart = 'etc';
-  static const String _defaultReqType = '?�버�??��?)';
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _problemController.dispose();
-    _inspectionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadOptions();
-  }
-
-  Future<void> _loadOptions() async {
-    try {
-      final options = await widget.client.fetchFieldOptions();
-      if (!mounted) {
-        return;
-      }
-      final customerParts = options.customerParts;
-      final reqTypes = options.reqTypes;
-      setState(() {
-        _customerParts = customerParts;
-        _reqTypes = reqTypes;
-        _selectedCustomerPart =
-            _pickDefault(customerParts, _defaultCustomerPart);
-        _selectedReqType = _pickDefault(reqTypes, _defaultReqType);
-        _isLoadingOptions = false;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _error = '?�션 로딩 ?�패: $e';
-        _isLoadingOptions = false;
-      });
-    }
-  }
-
-  String? _pickDefault(List<String> options, String preferred) {
-    if (options.contains(preferred)) {
-      return preferred;
-    }
-    if (options.isNotEmpty) {
-      return options.first;
-    }
-    return null;
-  }
-
-  Future<void> _submit() async {
-    final title = _titleController.text.trim();
-    final problem = _problemController.text.trim();
-    final inspection = _inspectionController.text.trim();
-    final desc = _buildDescription(problem: problem, inspection: inspection);
-    final customerPart = _selectedCustomerPart;
-    final reqType = _selectedReqType;
-    if (title.isEmpty) {
-      setState(() => _error = '?�목???�력?�주?�요.');
-      return;
-    }
-    if (problem.length < 10) {
-      setState(() => _error = '문제 ?�용?� 최소 10글???�상 ?�력?�주?�요.');
-      return;
-    }
-    if (inspection.length < 10) {
-      setState(() => _error = '?��? ?�용?� 최소 10글???�상 ?�력?�주?�요.');
-      return;
-    }
-    if (customerPart == null || customerPart.isEmpty) {
-      setState(() => _error = 'Customer Part�??�택?�주?�요.');
-      return;
-    }
-    if (reqType == null || reqType.isEmpty) {
-      setState(() => _error = 'ReqType???�택?�주?�요.');
-      return;
-    }
-    setState(() {
-      _error = null;
-      _isSubmitting = true;
-    });
-    try {
-      final result = await widget.client.createIssue(
-        title: title,
-        description: desc,
-        customerPart: customerPart,
-        reqType: reqType,
-      );
-      if (!mounted) {
-        return;
-      }
-      _titleController.clear();
-      _problemController.clear();
-      _inspectionController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Jira ?�성 ?�료: ${result.key}'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _error = 'Jira ?�성 ?�패: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
-    }
-  }
-
-  String _buildDescription({
-    required String problem,
-    required String inspection,
-  }) {
-    return [
-      '[Problem]',
-      problem,
-      '',
-      '[Inspection]',
-      inspection,
-    ].join('\n');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 900),
-      child: BsCard(
-        child: Padding(
-          padding: const EdgeInsets.all(0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const BsText(
-                'Jira Task ?�성 (TS)',
-                variant: BsTextVariant.title,
-              ),
-              const SizedBox(height: 16),
-              if (_isLoadingOptions)
-                const LinearProgressIndicator(minHeight: 2),
-              if (_isLoadingOptions) const SizedBox(height: 12),
-              BsSelect<String>(
-                label: 'Customer Part',
-                value: _selectedCustomerPart,
-                items: _customerParts
-                    .map(
-                      (item) => DropdownMenuItem(
-                        value: item,
-                        child: Text(item),
-                      ),
-                    )
-                    .toList(),
-                enabled: !_isLoadingOptions,
-                onChanged: (value) => setState(() => _selectedCustomerPart = value),
-              ),
-              const SizedBox(height: 12),
-              BsSelect<String>(
-                label: 'ReqType',
-                value: _selectedReqType,
-                items: _reqTypes
-                    .map(
-                      (item) => DropdownMenuItem(
-                        value: item,
-                        child: Text(item),
-                      ),
-                    )
-                    .toList(),
-                enabled: !_isLoadingOptions,
-                onChanged: (value) => setState(() => _selectedReqType = value),
-              ),
-              const SizedBox(height: 12),
-              BsTextField(
-                controller: _titleController,
-                label: '?�목',
-              ),
-              const SizedBox(height: 12),
-              BsTextField(
-                controller: _problemController,
-                label: '문제 ?�용',
-                maxLines: 4,
-                helperText: '?�애 ?�점, 민원 ?�수 ?�점/?��? ?�호 ??,
-              ),
-              const SizedBox(height: 12),
-              BsTextField(
-                controller: _inspectionController,
-                label: '?��? ?�용',
-                maxLines: 4,
-                helperText: '물리/?�신 ?��? �??�???�용, ?�현 방법, 기�? ?�인 ?�항',
-              ),
-              const SizedBox(height: 12),
-              if (_error != null)
-                BsAlert(
-                  message: _error!,
-                  variant: BsVariant.danger,
-                ),
-              const SizedBox(height: 12),
-              BsButton(
-                onPressed: _isSubmitting ? null : _submit,
-                label: _isSubmitting ? '?�성 �?..' : 'Jira ?�성',
-              ),
             ],
           ),
         ),

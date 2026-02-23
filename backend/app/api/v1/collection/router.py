@@ -13,7 +13,6 @@ from app.domains.collection.schemas import (
 from app.domains.collection.service import (
     get_collection_item,
     list_collection_items,
-    resolve_framework_url_for_site,
     substitute,
 )
 
@@ -67,24 +66,6 @@ async def execute_item(payload: CollectionExecuteRequest, request: Request):
         raise HTTPException(status_code=404, detail="Collection item not found")
 
     params = dict(payload.params or {})
-    site_id: int | None = payload.site_id
-    if site_id is None:
-        raw_site_id = params.get("siteId")
-        if raw_site_id:
-            try:
-                site_id = int(raw_site_id)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail="siteId must be an integer") from exc
-    if site_id is not None:
-        params.setdefault("siteId", str(site_id))
-        framework_url = resolve_framework_url_for_site(site_id)
-        if not framework_url:
-            raise HTTPException(
-                status_code=400,
-                detail=f"siteId {site_id} has no mapped IP in info_danji.txt",
-            )
-        params["bds-core-framework-url"] = framework_url
-
     url = substitute(item.url, params, item.defaults)
     body = payload.body if payload.body is not None else item.body
     if body is not None:

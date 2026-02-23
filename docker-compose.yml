@@ -1,38 +1,5 @@
 name: dev_base_kit
 services:
-  vault:
-    image: ${VAULT_IMAGE:-hashicorp/vault:1.15.6}
-    cap_add:
-      - IPC_LOCK
-    ports:
-      - "8200:8200"
-    environment:
-      - VAULT_API_ADDR=http://vault:8200
-    command: ["vault", "server", "-config=/vault/config/config.hcl"]
-    volumes:
-      - vault_data:/vault/data
-      - ./vault/config.hcl:/vault/config/config.hcl:ro
-      - ./vault/policies:/vault/policies:ro
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:8200/v1/sys/health > /dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  vault-agent:
-    image: ${VAULT_IMAGE:-hashicorp/vault:1.15.6}
-    depends_on:
-      - vault
-    environment:
-      - VAULT_ADDR=http://vault:8200
-    command: ["vault", "agent", "-config=/vault/agent/agent.hcl"]
-    volumes:
-      - vault_secrets:/vault/secrets
-      - ./vault/agent.hcl:/vault/agent/agent.hcl:ro
-      - ./vault/templates:/vault/templates:ro
-      - ./vault/agent:/vault/agent
-    restart: unless-stopped
   web:
     build:
       context: .
@@ -62,13 +29,11 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       # window - sjshin
-      # - "C:\\Users\\G3A230206\\Desktop\\회사\\keyTokens/bas-key-new.pem:/app/keys/bas-key-new.pem:ro"
-      # - "C:\\Users\\G3A230206\\Desktop\\회사\\keyTokens/collection.json:/app/collection.json:ro"
+      # - "C:\\Users\\G3A230206\\Desktop\\company\\keyTokens/bas-key-new.pem:/app/keys/bas-key-new.pem:ro"
+      # - "C:\\Users\\G3A230206\\Desktop\\company\\keyTokens/collection.json:/app/collection.json:ro"
 
       # ubuntu - sjshin
-      - vault_secrets:/vault/secrets:ro
       - ${COLLECTION_FILE}:${COLLECTION_PATH}:ro
-      - ./info_danji.txt:/app/info_danji.txt:ro
     command:
       [
         "uvicorn",
@@ -126,7 +91,5 @@ services:
       retries: 5
 
 volumes:
-  vault_data:
-  vault_secrets:
   postgres_data:
   redis_data:

@@ -21,13 +21,13 @@ class _LlmSettingsPageState extends State<LlmSettingsPage> {
 
   void _save() {
     // TODO: call backend to save LLM settings.
-    setState(() => _status = 'LLM 설정이 저장되었습니다.');
+    setState(() => _status = 'LLM settings saved.');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('LLM 설정')),
+      appBar: AppBar(title: const Text('LLM Settings')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
@@ -54,7 +54,7 @@ class _LlmSettingsPageState extends State<LlmSettingsPage> {
                 const SizedBox(height: 12),
                 FilledButton(
                   onPressed: _save,
-                  child: const Text('저장'),
+                  child: const Text('Save'),
                 ),
                 if (_status != null) ...[
                   const SizedBox(height: 12),

@@ -32,7 +32,7 @@ def _init_db(conn: sqlite3.Connection) -> None:
 def _seed_defaults(conn: sqlite3.Connection) -> None:
     defaults = {
         "customer_part": ["etc"],
-        "req_type": ["디버깅(점검)"],
+        "req_type": ["Debugging (Inspection)"],
     }
     for field_key, values in defaults.items():
         for value in values:

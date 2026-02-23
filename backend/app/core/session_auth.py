@@ -15,9 +15,6 @@ _PUBLIC_PATHS = {
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/ht-oauth/login",
-    "/ht-oauth/logout",
-    "/dj-oauth/login",
     "/config/auto-logout",
     "/config/version",
 }

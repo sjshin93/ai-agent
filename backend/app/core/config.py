@@ -79,11 +79,6 @@ class Settings:
     openwebui_chat_path: str = _get("OPENWEBUI_CHAT_PATH", "/v1/chat/completions")
     openwebui_default_model: str = _get("OPENWEBUI_DEFAULT_MODEL", "")
 
-    danji_base_url: str = _get("DANJI_BASE_URL", "http://danji:8002")
-    danji_username: str = _get("DANJI_USERNAME", "")
-    danji_password: str = _get("DANJI_PASSWORD", "")
-    danji_ssh_key_path: str = _get("DANJI_SSH_KEY_PATH", "")
-
     server_host: str = _get("SERVER_HOST", "0.0.0.0")
     server_port: int = int(_get("SERVER_PORT", "8000"))
     log_level: str = _get_log_level()
@@ -104,34 +99,18 @@ class Settings:
     postgres_pool_min_size: int = _get_int("POSTGRES_POOL_MIN_SIZE", 1)
     postgres_pool_max_size: int = _get_int("POSTGRES_POOL_MAX_SIZE", 10)
     redis_url: str = _get("REDIS_URL", "redis://redis:6379/0")
-    session_cookie_name: str = _get("SESSION_COOKIE_NAME", "ht_session_id")
+    session_cookie_name: str = _get("SESSION_COOKIE_NAME", "session_id")
     session_cookie_secure: bool = _get_bool("SESSION_COOKIE_SECURE", False)
     oauth_token_url: str = _get("OAUTH_TOKEN_URL", "")
-    dj_oauth_url: str = _get(
-        "DJ_OAUTH_URL",
-        "https://dj-oauth.hthomeservice.com:9092/api/v1/user/login",
-    )
-    dj_household_url: str = _get(
-        "DJ_HOUSEHOLD_URL",
-        "https://dj-oauth.hthomeservice.com:9092/api/v1/user/danji/household",
-    )
-    dj_oauth_basic_user: str = _get("DJ_OAUTH_BASIC_USER", "ht-app-1.0-ios")
-    dj_oauth_basic_pass: str = _get(
-        "DJ_OAUTH_BASIC_PASS",
-        "OlsiUk9MRV9BRE1JTiJdLCJqdGkiOiI0Z",
-    )
     collection_path: str = _get("COLLECTION_PATH", "")
     collection_base_url: str = _get("COLLECTION_BASE_URL", "")
     collection_log_path: str = _get("COLLECTION_LOG_PATH", "data/api_test.log")
-    danji_info_path: str = _get("DANJI_INFO_PATH", "")
-    danji_framework_scheme: str = _get("DANJI_FRAMEWORK_SCHEME", "https")
-    danji_framework_port: int = _get_int("DANJI_FRAMEWORK_PORT", 30001)
     aws_ssh_host: str = _get("AWS_SSH_HOST", "")
     aws_ssh_port: int = _get_int("AWS_SSH_PORT", 22)
     aws_ssh_user: str = _get("AWS_SSH_USER", "")
     aws_ssh_key_path: str = _get("AWS_SSH_KEY_PATH", "")
     aws_ssh_aliases_path: str = _get("AWS_SSH_ALIASES_PATH", "~/.bash_aliases")
-    danji_ssh_password: str = _get("DANJI_SSH_PASSWORD", "")
+    ssh_target_password: str = _get("SSH_TARGET_PASSWORD", "")
 
     jira_base_url: str = _get("JIRA_BASE_URL", "")
     jira_email: str = _get("JIRA_EMAIL", "")

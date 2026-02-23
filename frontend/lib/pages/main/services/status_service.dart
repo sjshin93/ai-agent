@@ -13,7 +13,6 @@ class StatusService {
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     return StatusResult(
       llmOk: data['llm_ok'] == true,
-      danjiOk: data['danji_ok'] == true,
       version: data['version']?.toString() ?? '--',
     );
   }
@@ -22,11 +21,9 @@ class StatusService {
 class StatusResult {
   const StatusResult({
     required this.llmOk,
-    required this.danjiOk,
     required this.version,
   });
 
   final bool llmOk;
-  final bool danjiOk;
   final String version;
 }

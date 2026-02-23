@@ -430,7 +430,7 @@ class _ApiTestTabState extends State<ApiTestTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const PageHelpBox(
-                    message: '저장된 API 컬렉션을 호출해 요청/응답을 검증할 수 있는 페이지입니다.',
+                    message: 'Use this page to call saved API collection items and validate requests/responses.',
                   ),
                   const SizedBox(height: 16),
                   Row(

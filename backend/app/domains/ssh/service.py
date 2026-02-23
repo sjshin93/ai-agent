@@ -66,10 +66,10 @@ class SshService:
                     output_chunks.append(chunk)
                     if (
                         not password_sent
-                        and settings.danji_ssh_password
+                        and settings.ssh_target_password
                         and "password" in chunk.lower()
                     ):
-                        stdin.write(f"{settings.danji_ssh_password}\n")
+                        stdin.write(f"{settings.ssh_target_password}\n")
                         stdin.flush()
                         password_sent = True
                 if channel.recv_stderr_ready():
@@ -77,10 +77,10 @@ class SshService:
                     err_chunks.append(chunk)
                     if (
                         not password_sent
-                        and settings.danji_ssh_password
+                        and settings.ssh_target_password
                         and "password" in chunk.lower()
                     ):
-                        stdin.write(f"{settings.danji_ssh_password}\n")
+                        stdin.write(f"{settings.ssh_target_password}\n")
                         stdin.flush()
                         password_sent = True
 
@@ -103,7 +103,7 @@ class SshService:
             if "password" in combined and "permission denied" in combined:
                 logger.warning("SSH: serverA authentication failed")
                 raise RuntimeError("ServerA authentication failed")
-            if "password" in combined and not settings.danji_ssh_password:
+            if "password" in combined and not settings.ssh_target_password:
                 logger.warning("SSH: serverA password required but not provided")
                 raise RuntimeError("ServerA password required")
             if err.strip():

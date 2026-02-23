@@ -4,7 +4,6 @@ import 'dart:html' as html;
 class SessionStore {
   static const _key = 'username';
   static const _tokenKey = 'access_token';
-  static const _djTokenKey = 'dj_access_token';
   static const _logsKey = 'api_test_logs';
   static const _logsFilenameKey = 'api_test_logs_filename';
   static const _logsEnabledKey = 'api_test_logs_enabled';
@@ -27,16 +26,6 @@ class SessionStore {
       return;
     }
     html.window.localStorage[_tokenKey] = value;
-  }
-
-  String? getDjAccessToken() => html.window.localStorage[_djTokenKey];
-
-  void setDjAccessToken(String? value) {
-    if (value == null || value.isEmpty) {
-      html.window.localStorage.remove(_djTokenKey);
-      return;
-    }
-    html.window.localStorage[_djTokenKey] = value;
   }
 
   String? getApiTestLogs() => html.window.localStorage[_logsKey];

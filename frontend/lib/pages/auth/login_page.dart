@@ -33,7 +33,6 @@ class _LoginPageState extends State<LoginPage> {
     final username = _userController.text.trim();
     SessionService.setUsername(username.isEmpty ? 'local-user' : username);
     SessionService.setAccessToken(null);
-    SessionService.setDjAccessToken(null);
     Navigator.of(context).pushReplacementNamed(AppRoutes.main);
   }
 
@@ -57,7 +56,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 8),
                   const BsText(
-                    'Company auth login (HT/DanJi) has been removed.',
+                    'Company-specific auth has been removed.',
                     variant: BsTextVariant.muted,
                     textAlign: TextAlign.center,
                   ),

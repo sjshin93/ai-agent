@@ -12,10 +12,6 @@ class SessionService {
 
   static void setAccessToken(String? value) => _store.setAccessToken(value);
 
-  static String? getDjAccessToken() => _store.getDjAccessToken();
-
-  static void setDjAccessToken(String? value) => _store.setDjAccessToken(value);
-
   static String? getApiTestLogs() => _store.getApiTestLogs();
 
   static void setApiTestLogs(String? value) => _store.setApiTestLogs(value);
