@@ -1,0 +1,15 @@
+
+
+
+# secrets / runtime artifacts
+vault/
+**/pidfile
+**/*.pid
+
+# common junk
+.git
+**/__pycache__/
+**/*.pyc
+node_modules/
+build/
+dist/

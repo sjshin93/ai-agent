@@ -1,0 +1,132 @@
+name: dev_base_kit
+services:
+  vault:
+    image: ${VAULT_IMAGE:-hashicorp/vault:1.15.6}
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_API_ADDR=http://vault:8200
+    command: ["vault", "server", "-config=/vault/config/config.hcl"]
+    volumes:
+      - vault_data:/vault/data
+      - ./vault/config.hcl:/vault/config/config.hcl:ro
+      - ./vault/policies:/vault/policies:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8200/v1/sys/health > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  vault-agent:
+    image: ${VAULT_IMAGE:-hashicorp/vault:1.15.6}
+    depends_on:
+      - vault
+    environment:
+      - VAULT_ADDR=http://vault:8200
+    command: ["vault", "agent", "-config=/vault/agent/agent.hcl"]
+    volumes:
+      - vault_secrets:/vault/secrets
+      - ./vault/agent.hcl:/vault/agent/agent.hcl:ro
+      - ./vault/templates:/vault/templates:ro
+      - ./vault/agent:/vault/agent
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    env_file:
+      - ./.env
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost/ > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: backend
+    env_file:
+      - ./.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      # window - sjshin
+      # - "C:\\Users\\G3A230206\\Desktop\\회사\\keyTokens/bas-key-new.pem:/app/keys/bas-key-new.pem:ro"
+      # - "C:\\Users\\G3A230206\\Desktop\\회사\\keyTokens/collection.json:/app/collection.json:ro"
+
+      # ubuntu - sjshin
+      - vault_secrets:/vault/secrets:ro
+      - ${COLLECTION_FILE}:${COLLECTION_PATH}:ro
+      - ./info_danji.txt:/app/info_danji.txt:ro
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--log-config",
+        "/app/app/core/uvicorn_log_config.json",
+        "--log-level",
+        "${LOG_LEVEL:-info}"
+      ]
+    expose:
+      - "8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8000/health > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-app}
+      - POSTGRES_USER=${POSTGRES_USER:-app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-app}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  vault_data:
+  vault_secrets:
+  postgres_data:
+  redis_data:

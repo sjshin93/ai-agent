@@ -1,0 +1,9 @@
+.env
+keys/
+backend/app/data/*.db
+vault/agent/role_id
+vault/agent/secret_id
+vault/agent/token
+vault/data/
+pidfile
+info_danji.txt
