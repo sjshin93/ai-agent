@@ -1,23 +1,21 @@
 server {
   listen 80;
   server_name _;
-  # Allow larger uploads for Jira attachments.
   client_max_body_size 100m;
+
+  error_log /var/log/nginx/error.log info;
 
   root /usr/share/nginx/html;
   index index.html;
 
-  # Nginx log level (info|notice|warn|error|crit|alert|emerg|debug)
-  error_log /var/log/nginx/error.log ${LOG_LEVEL};
-
-  # Flutter SPA routing: serve index.html for unknown paths
+  # Flutter SPA routing: serve index.html for unknown paths.
   location / {
     try_files $uri $uri/ /index.html;
   }
 
-  # Proxy API requests to FastAPI container
+  # Proxy API requests to FastAPI service in docker network.
   location /api/ {
-    # Note: trailing slash strips the /api prefix.
+    # Trailing slash removes the /api prefix.
     proxy_pass http://api:8000/;
 
     proxy_set_header Host $host;
