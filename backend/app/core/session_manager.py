@@ -60,7 +60,7 @@ class SessionManager:
                         """
                         CREATE TABLE IF NOT EXISTS user_sessions (
                           session_id TEXT PRIMARY KEY,
-                          username TEXT NOT NULL,
+                          user_id TEXT NOT NULL,
                           created_at TIMESTAMPTZ NOT NULL,
                           last_activity_at TIMESTAMPTZ NOT NULL,
                           expires_at TIMESTAMPTZ NOT NULL,
@@ -73,7 +73,7 @@ class SessionManager:
                         CREATE TABLE IF NOT EXISTS user_activity_logs (
                           id BIGSERIAL PRIMARY KEY,
                           occurred_at TIMESTAMPTZ NOT NULL,
-                          username TEXT NOT NULL,
+                          user_id TEXT NOT NULL,
                           session_id TEXT NOT NULL,
                           method TEXT NOT NULL,
                           path TEXT NOT NULL,
@@ -82,6 +82,134 @@ class SessionManager:
                           client_ip TEXT NOT NULL,
                           user_agent TEXT NOT NULL
                         )
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS users (
+                          user_id TEXT PRIMARY KEY,
+                          provider TEXT NOT NULL,
+                          provider_user_id TEXT NOT NULL,
+                          role TEXT NOT NULL,
+                          nickname TEXT NOT NULL,
+                          created_at TIMESTAMPTZ NOT NULL,
+                          updated_at TIMESTAMPTZ NOT NULL,
+                          last_login_at TIMESTAMPTZ NOT NULL
+                        )
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS llm_chat_logs (
+                          id BIGSERIAL PRIMARY KEY,
+                          occurred_at TIMESTAMPTZ NOT NULL,
+                          user_id TEXT NOT NULL,
+                          model TEXT NOT NULL,
+                          prompt TEXT NOT NULL,
+                          response TEXT NOT NULL
+                        )
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS llm_chat_logs_user_time_idx
+                        ON llm_chat_logs(user_id, occurred_at DESC)
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS users_provider_provider_user_id_uniq
+                        ON users(provider, provider_user_id)
+                        """
+                    )
+                    # Backward compatibility for previously created tables.
+                    await conn.execute(
+                        """
+                        ALTER TABLE users
+                        ADD COLUMN IF NOT EXISTS role TEXT
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        UPDATE users
+                        SET role = 'user'
+                        WHERE role IS NULL OR role = ''
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        ALTER TABLE users
+                        ALTER COLUMN role SET NOT NULL
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        ALTER TABLE user_sessions
+                        ADD COLUMN IF NOT EXISTS user_id TEXT
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        DO $$
+                        BEGIN
+                          IF EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_name = 'user_sessions'
+                              AND column_name = 'username'
+                          ) THEN
+                            UPDATE user_sessions
+                            SET user_id = username
+                            WHERE user_id IS NULL OR user_id = '';
+                          END IF;
+                        END $$;
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        ALTER TABLE user_sessions
+                        ALTER COLUMN user_id SET NOT NULL
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        ALTER TABLE user_sessions
+                        DROP COLUMN IF EXISTS username
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        ALTER TABLE user_activity_logs
+                        ADD COLUMN IF NOT EXISTS user_id TEXT
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        DO $$
+                        BEGIN
+                          IF EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_name = 'user_activity_logs'
+                              AND column_name = 'username'
+                          ) THEN
+                            UPDATE user_activity_logs
+                            SET user_id = username
+                            WHERE user_id IS NULL OR user_id = '';
+                          END IF;
+                        END $$;
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        ALTER TABLE user_activity_logs
+                        ALTER COLUMN user_id SET NOT NULL
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        ALTER TABLE user_activity_logs
+                        DROP COLUMN IF EXISTS username
                         """
                     )
                 await redis.ping()
@@ -105,7 +233,7 @@ class SessionManager:
             await self._pool.close()
             self._pool = None
 
-    async def create_session(self, username: str) -> str:
+    async def create_session(self, user_id: str) -> str:
         pool, redis = self._require_ready()
         now = _utcnow()
         expires_at = now + timedelta(seconds=self._timeout_seconds)
@@ -115,18 +243,18 @@ class SessionManager:
             await conn.execute(
                 """
                 INSERT INTO user_sessions (
-                  session_id, username, created_at, last_activity_at, expires_at
+                  session_id, user_id, created_at, last_activity_at, expires_at
                 )
                 VALUES ($1, $2, $3, $4, $5)
                 """,
                 session_id,
-                username,
+                user_id,
                 now,
                 now,
                 expires_at,
             )
 
-        payload = json.dumps({"username": username})
+        payload = json.dumps({"user_id": user_id})
         await redis.set(self._redis_key(session_id), payload, ex=self._timeout_seconds)
         return session_id
 
@@ -139,11 +267,11 @@ class SessionManager:
 
         try:
             cache = json.loads(raw)
-            cached_username = str(cache.get("username") or "").strip()
+            cached_user_id = str(cache.get("user_id") or cache.get("username") or "").strip()
         except (TypeError, ValueError, json.JSONDecodeError):
             await redis.delete(key)
             return None
-        if not cached_username:
+        if not cached_user_id:
             await redis.delete(key)
             return None
 
@@ -152,7 +280,7 @@ class SessionManager:
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT username, revoked_at
+                SELECT user_id, revoked_at
                 FROM user_sessions
                 WHERE session_id = $1
                 """,
@@ -161,7 +289,8 @@ class SessionManager:
             if row is None:
                 await redis.delete(key)
                 return None
-            if row["revoked_at"] is not None or row["username"] != cached_username:
+            row_user_id = str(row["user_id"] or "").strip()
+            if row["revoked_at"] is not None or row_user_id != cached_user_id:
                 await redis.delete(key)
                 return None
 
@@ -178,7 +307,7 @@ class SessionManager:
             )
 
         await redis.expire(key, self._timeout_seconds)
-        return cached_username
+        return cached_user_id
 
     async def revoke_session(self, session_id: str) -> None:
         pool, redis = self._require_ready()
@@ -228,7 +357,7 @@ class SessionManager:
     async def record_activity(
         self,
         *,
-        username: str,
+        user_id: str,
         session_id: str,
         method: str,
         path: str,
@@ -244,7 +373,7 @@ class SessionManager:
                 """
                 INSERT INTO user_activity_logs (
                   occurred_at,
-                  username,
+                  user_id,
                   session_id,
                   method,
                   path,
@@ -256,7 +385,7 @@ class SessionManager:
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 """,
                 occurred_at,
-                username,
+                user_id,
                 session_id,
                 method,
                 path,
@@ -264,4 +393,91 @@ class SessionManager:
                 duration_ms,
                 client_ip,
                 user_agent,
+            )
+
+    async def upsert_user(
+        self,
+        *,
+        user_id: str,
+        provider: str,
+        provider_user_id: str,
+        role: str,
+        nickname: str,
+    ) -> None:
+        pool, _ = self._require_ready()
+        now = _utcnow()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO users (
+                  user_id,
+                  provider,
+                  provider_user_id,
+                  role,
+                  nickname,
+                  created_at,
+                  updated_at,
+                  last_login_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $6, $6)
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                  provider = EXCLUDED.provider,
+                  provider_user_id = EXCLUDED.provider_user_id,
+                  role = EXCLUDED.role,
+                  nickname = EXCLUDED.nickname,
+                  updated_at = EXCLUDED.updated_at,
+                  last_login_at = EXCLUDED.last_login_at
+                """,
+                user_id,
+                provider,
+                provider_user_id,
+                role,
+                nickname,
+                now,
+            )
+
+    async def get_user_nickname(self, user_id: str) -> str | None:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            value = await conn.fetchval(
+                """
+                SELECT nickname
+                FROM users
+                WHERE user_id = $1
+                """,
+                user_id,
+            )
+        if value is None:
+            return None
+        nickname = str(value).strip()
+        return nickname or None
+
+    async def record_llm_chat(
+        self,
+        *,
+        user_id: str,
+        model: str,
+        prompt: str,
+        response: str,
+    ) -> None:
+        pool, _ = self._require_ready()
+        occurred_at = _utcnow()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO llm_chat_logs (
+                  occurred_at,
+                  user_id,
+                  model,
+                  prompt,
+                  response
+                )
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                occurred_at,
+                user_id,
+                model,
+                prompt,
+                response,
             )

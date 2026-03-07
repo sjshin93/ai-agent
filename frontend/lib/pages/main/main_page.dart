@@ -8,13 +8,13 @@ import 'services/config_service.dart';
 import 'services/llm_service.dart';
 import 'services/slack_notification_service.dart';
 import '../../services/session_service.dart';
-import 'services/ssh_service.dart';
 import '../../widgets/bs/bs_button.dart';
 import '../../widgets/bs/bs_card.dart';
+import '../../widgets/bs/bs_select.dart';
+import '../../widgets/bs/bs_text_field.dart';
 import '../../widgets/bs/bs_text.dart';
 import '../../widgets/page_help_box.dart';
 import '../../widgets/status_footer.dart';
-import 'api_test_tab.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -23,10 +23,8 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage>
-    with SingleTickerProviderStateMixin {
+class _MainPageState extends State<MainPage> {
   final _slackNoti = SlackNotificationService();
-  final _ssh = SshService();
   final _llm = LlmService();
   final _config = ConfigService();
   final _auth = AuthService();
@@ -35,7 +33,7 @@ class _MainPageState extends State<MainPage>
   Timer? _countdownTimer;
   DateTime? _lastSessionTouchedAt;
   bool _isSessionTouching = false;
-  String _footerLabel = 'Feature Test';
+  String _footerLabel = 'LLM - Chat';
   String _footerTimestamp = _formatTimestamp(DateTime.now());
   Duration _idleTimeout = const Duration(minutes: 5);
   int _remainingSeconds = 300;
@@ -147,108 +145,18 @@ class _MainPageState extends State<MainPage>
     );
   }
 
-
-  Future<void> _sendSlackTest() async {
-    try {
-      await _slackNoti.sendSlackMessage('Hello Slack');
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Slack message sent')),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Slack failed: $e')),
-      );
-    }
-  }
-
-  Future<void> _runLlmTest() async {
-    final prompt = await _askPrompt();
-    if (prompt == null || prompt.trim().isEmpty) {
-      return;
-    }
-    try {
-      final output = await _llm.query(prompt.trim());
-      if (!mounted) {
-        return;
-      }
-      await showDialog<void>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('LLM Response'),
-          content: SingleChildScrollView(
-            child: Text(output),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('LLM failed: $e')),
-      );
-    }
-  }
-
-  Future<void> _fetchSshCommand(String command) async {
-    final siteId = await _askSiteId();
-    if (siteId == null || siteId.trim().isEmpty) {
-      return;
-    }
-    try {
-      final username = SessionService.getUsername() ?? 'unknown';
-      final output = await _ssh.fetchCommand(siteId.trim(), command, username);
-      if (!mounted) {
-        return;
-      }
-      await showDialog<void>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text('$command (site $siteId)'),
-          content: SingleChildScrollView(
-            child: Text(output),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('SSH $command failed: $e')),
-      );
-    }
-  }
-
-  Future<String?> _askPrompt() async {
+  Future<void> _sendInquiry() async {
     final controller = TextEditingController();
-    final result = await showDialog<String>(
+    final inquiry = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Enter prompt'),
+        title: const Text('Inquiry'),
         content: TextField(
           controller: controller,
-          maxLines: 3,
+          maxLines: 5,
           decoration: const InputDecoration(
-            labelText: 'prompt',
+            labelText: 'Message',
+            hintText: 'Write your inquiry here',
           ),
         ),
         actions: [
@@ -257,43 +165,40 @@ class _MainPageState extends State<MainPage>
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('OK'),
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Send'),
           ),
         ],
       ),
     );
     controller.dispose();
-    return result;
+
+    if (inquiry == null || inquiry.isEmpty) {
+      return;
+    }
+
+    final userId = SessionService.getUsername() ?? 'unknown-user';
+    final message = '[$userId] "$inquiry"';
+    try {
+      await _slackNoti.sendSlackMessage(message);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Inquiry sent to Slack')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Inquiry failed: $e')),
+      );
+    }
   }
 
-  Future<String?> _askSiteId() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Enter site ID'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'site_id (e.g. 8)',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return result;
-  }
+  Future<String> _queryLlm(String prompt, {String? model}) =>
+      _llm.query(prompt, model: model);
 
   static String _formatTimestamp(DateTime time) {
     final y = time.year.toString().padLeft(4, '0');
@@ -313,10 +218,11 @@ class _MainPageState extends State<MainPage>
 
   @override
   Widget build(BuildContext context) {
-    const tabs = [
-      Tab(text: 'Feature Test'),
-      Tab(text: 'API Test'),
+    const topTabs = [
+      Tab(text: 'LLM'),
+      Tab(text: 'Archives'),
     ];
+
     return RawKeyboardListener(
       focusNode: _focusNode,
       autofocus: true,
@@ -326,19 +232,24 @@ class _MainPageState extends State<MainPage>
         onPointerMove: (_) => _resetIdleTimer(),
         onPointerSignal: (_) => _resetIdleTimer(),
         child: DefaultTabController(
-          length: tabs.length,
+          length: topTabs.length,
+          initialIndex: 0,
           child: Scaffold(
             appBar: AppBar(
+              leadingWidth: 110,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: TextButton.icon(
+                  onPressed: _sendInquiry,
+                  icon: const Icon(Icons.support_agent, size: 18),
+                  label: const Text('Inquiry'),
+                ),
+              ),
               bottom: TabBar(
+                tabs: topTabs,
                 onTap: (index) {
-                  final label = switch (index) {
-                    0 => 'Feature Test',
-                    1 => 'API Test',
-                    _ => 'Unknown',
-                  };
-                  _updateFooterLabel(label);
+                  _updateFooterLabel(index == 0 ? 'LLM - Chat' : 'Archives - Archive-picture');
                 },
-                tabs: tabs,
               ),
               actions: [
                 Center(
@@ -358,13 +269,13 @@ class _MainPageState extends State<MainPage>
             ),
             body: TabBarView(
               children: [
-                _StatusDashboard(
-                  onLlmTest: _runLlmTest,
-                  onSlackTest: _sendSlackTest,
-                  onSshTop: () => _fetchSshCommand('top'),
-                  onSshFree: () => _fetchSshCommand('free'),
+                _LlmWorkspace(
+                  onContextChanged: _updateFooterLabel,
+                  onQuery: _queryLlm,
                 ),
-                const ApiTestTab(),
+                _ArchiveWorkspace(
+                  onContextChanged: _updateFooterLabel,
+                ),
               ],
             ),
             bottomNavigationBar: StatusFooter(
@@ -378,111 +289,354 @@ class _MainPageState extends State<MainPage>
   }
 }
 
-class _StatusDashboard extends StatelessWidget {
-  const _StatusDashboard({
-    required this.onLlmTest,
-    required this.onSlackTest,
-    required this.onSshTop,
-    required this.onSshFree,
+class _LlmWorkspace extends StatefulWidget {
+  const _LlmWorkspace({
+    required this.onContextChanged,
+    required this.onQuery,
   });
-  final VoidCallback onLlmTest;
-  final VoidCallback onSlackTest;
-  final VoidCallback onSshTop;
-  final VoidCallback onSshFree;
+  final ValueChanged<String> onContextChanged;
+  final Future<String> Function(String prompt, {String? model}) onQuery;
+
+  @override
+  State<_LlmWorkspace> createState() => _LlmWorkspaceState();
+}
+
+class _LlmWorkspaceState extends State<_LlmWorkspace> {
+  static const _tabs = ['Chat'];
+  static const _geminiModels = [
+    _GeminiModelOption(label: 'Latest Flash', value: 'gemini-flash-latest'),
+    _GeminiModelOption(label: 'Latest Pro', value: 'gemini-pro-latest'),
+  ];
+  final _promptController = TextEditingController();
+  final _scrollController = ScrollController();
+  bool _isSending = false;
+  final List<_ChatMessage> _messages = [];
+  int _selectedIndex = 0;
+  _GeminiModelOption _selectedModel = _geminiModels[0];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.onContextChanged('LLM - ${_tabs[_selectedIndex]}');
+  }
+
+  @override
+  void dispose() {
+    _promptController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent + 80,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _send() async {
+    final prompt = _promptController.text.trim();
+    if (prompt.isEmpty || _isSending) {
+      return;
+    }
+    setState(() {
+      _isSending = true;
+      _messages.add(_ChatMessage(role: 'user', text: prompt));
+      _promptController.clear();
+    });
+    _scrollToBottom();
+    try {
+      final output = await widget.onQuery(
+        prompt,
+        model: _selectedModel.value,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _messages.add(_ChatMessage(role: 'assistant', text: output));
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _messages.add(_ChatMessage(role: 'assistant', text: 'LLM failed: $e'));
+      });
+      _scrollToBottom();
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const PageHelpBox(
-                message: 'This page lets you verify that the main features are working as expected.',
+    return _TwoPaneLayout(
+      leftWidth: 220,
+      left: BsCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const BsText('LLM', variant: BsTextVariant.subtitle),
+            const SizedBox(height: 8),
+            for (var i = 0; i < _tabs.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: BsButton(
+                  onPressed: () {
+                    setState(() => _selectedIndex = i);
+                    widget.onContextChanged('LLM - ${_tabs[_selectedIndex]}');
+                  },
+                  label: _tabs[i],
+                  fullWidth: true,
+                  outline: i != _selectedIndex,
+                ),
               ),
-              const SizedBox(height: 16),
-              const BsText(
-                'Quick Actions',
-                variant: BsTextVariant.title,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  _StatusCard(
-                    title: 'LLM Test',
-                    value: 'Send prompt',
-                    actionLabel: 'Run LLM',
-                    onPressed: onLlmTest,
-                  ),
-                  _StatusCard(
-                    title: 'Slack Notification',
-                    value: 'Send test message',
-                    actionLabel: 'Hello Slack',
-                    onPressed: onSlackTest,
-                  ),
-                  _StatusCard(
-                    title: 'Target Server SSH',
-                    value: 'Run top once',
-                    actionLabel: 'Fetch top',
-                    onPressed: onSshTop,
-                  ),
-                  _StatusCard(
-                    title: 'Target Server SSH',
-                    value: 'Run free -m',
-                    actionLabel: 'Fetch free',
-                    onPressed: onSshFree,
-                  ),
-                ],
-              ),
-              // Jira issue panel removed from TEST PAGE.
-            ],
-          ),
+          ],
         ),
+      ),
+      right: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BsCard(
+            child: BsSelect<_GeminiModelOption>(
+              label: 'Model',
+              value: _selectedModel,
+              items: _geminiModels
+                  .map(
+                    (model) => DropdownMenuItem<_GeminiModelOption>(
+                      value: model,
+                      child: Text(model.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() => _selectedModel = value);
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          BsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const BsText('Chat', variant: BsTextVariant.subtitle),
+                const SizedBox(height: 8),
+                Container(
+                  height: 360,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: _messages.isEmpty
+                      ? const Center(
+                          child: BsText(
+                            'Start chatting with a prompt.',
+                            variant: BsTextVariant.muted,
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            final message = _messages[index];
+                            final isUser = message.role == 'user';
+                            return Align(
+                              alignment: isUser
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: Container(
+                                constraints: const BoxConstraints(maxWidth: 560),
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isUser
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  message.text,
+                                  style: TextStyle(
+                                    color: isUser
+                                        ? Theme.of(context).colorScheme.onPrimary
+                                        : Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                const SizedBox(height: 12),
+                BsTextField(
+                  controller: _promptController,
+                  label: 'Prompt',
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                BsButton(
+                  onPressed: _isSending ? null : _send,
+                  label: _isSending ? 'Sending...' : 'Send',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.title,
-    required this.value,
-    this.actionLabel,
-    this.onPressed,
-  });
+class _ChatMessage {
+  const _ChatMessage({required this.role, required this.text});
+  final String role;
+  final String text;
+}
 
-  final String title;
+class _GeminiModelOption {
+  const _GeminiModelOption({required this.label, required this.value});
+  final String label;
   final String value;
-  final String? actionLabel;
-  final VoidCallback? onPressed;
+}
+
+class _ArchiveWorkspace extends StatefulWidget {
+  const _ArchiveWorkspace({
+    required this.onContextChanged,
+  });
+  final ValueChanged<String> onContextChanged;
+
+  @override
+  State<_ArchiveWorkspace> createState() => _ArchiveWorkspaceState();
+}
+
+class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
+  static const _archives = [
+    'Archive-picture',
+    'Archive-video',
+    'Archive-Timbre',
+    'Archive-Prosody',
+    'Archive-emotion',
+    'Archive-Natural Speech',
+    'Archive-Diary',
+  ];
+  int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.onContextChanged('Feature Test - ${_archives[_selectedIndex]}');
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 260,
-      child: BsCard(
-        child: Padding(
-          padding: const EdgeInsets.all(0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              BsText(title, variant: BsTextVariant.subtitle),
-              const SizedBox(height: 8),
-              BsText(value),
-              if (actionLabel != null && onPressed != null) ...[
-                const SizedBox(height: 12),
-                BsButton(onPressed: onPressed, label: actionLabel!),
-              ],
-            ],
-          ),
+    return _TwoPaneLayout(
+      leftWidth: 230,
+      left: BsCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const BsText('Feature Archives', variant: BsTextVariant.subtitle),
+            const SizedBox(height: 8),
+            for (var i = 0; i < _archives.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: BsButton(
+                  onPressed: () {
+                    setState(() => _selectedIndex = i);
+                    widget.onContextChanged(
+                      'Archives - ${_archives[_selectedIndex]}',
+                    );
+                  },
+                  label: _archives[i],
+                  fullWidth: true,
+                  outline: i != _selectedIndex,
+                ),
+              ),
+          ],
         ),
       ),
+      right: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const PageHelpBox(
+            message: 'Browse archive categories from the left sub tabs.',
+          ),
+          const SizedBox(height: 16),
+          BsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const BsText('Selected Archive', variant: BsTextVariant.subtitle),
+                const SizedBox(height: 8),
+                BsText(_archives[_selectedIndex]),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TwoPaneLayout extends StatelessWidget {
+  const _TwoPaneLayout({
+    required this.left,
+    required this.right,
+    required this.leftWidth,
+  });
+
+  final Widget left;
+  final Widget right;
+  final double leftWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 900;
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: isNarrow
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        left,
+                        const SizedBox(height: 16),
+                        right,
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(width: leftWidth, child: left),
+                        const SizedBox(width: 16),
+                        Expanded(child: right),
+                      ],
+                    ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

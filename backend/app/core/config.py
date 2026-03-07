@@ -68,12 +68,23 @@ def _get_bool(key: str, default: bool) -> bool:
     return default
 
 
+def _get_csv(key: str, default: str = "") -> list[str]:
+    value = _get(key, default)
+    result: list[str] = []
+    for raw in value.split(","):
+        item = raw.strip()
+        if item:
+            result.append(item)
+    return result
+
+
 class Settings:
     # TODO: swap to pydantic-settings if you want validation.
     slack_webhook_url: str = _get("SLACK_WEBHOOK_URL", "")
 
     llm_base_url: str = _get("LLM_BASE_URL", "http://llm:8001")
     llm_api_key: str = _get("LLM_API_KEY", "")
+    gemini_api_key: str = _get("GEMINI_API_KEY", "")
     openwebui_base_url: str = _get("OPENWEBUI_BASE_URL", "")
     openwebui_api_key: str = _get("OPENWEBUI_API_KEY", "")
     openwebui_chat_path: str = _get("OPENWEBUI_CHAT_PATH", "/v1/chat/completions")
@@ -118,6 +129,10 @@ class Settings:
     )
     kakao_success_redirect: str = _get("KAKAO_SUCCESS_REDIRECT", "/login?kakao=ok")
     kakao_failure_redirect: str = _get("KAKAO_FAILURE_REDIRECT", "/login?kakao=error")
+    admin_user_ids: list[str] = _get_csv(
+        "ADMIN_USER_IDS",
+        "kakao_4784641296,google_112479972436700768040",
+    )
     collection_path: str = _get("COLLECTION_PATH", "")
     collection_base_url: str = _get("COLLECTION_BASE_URL", "")
     collection_log_path: str = _get("COLLECTION_LOG_PATH", "data/api_test.log")

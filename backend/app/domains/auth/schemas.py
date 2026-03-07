@@ -3,7 +3,8 @@ from pydantic import BaseModel
 
 class MeResponse(BaseModel):
     authenticated: bool
-    username: str | None = None
+    user_id: str | None = None
+    nickname: str | None = None
 
 
 class LogoutResponse(BaseModel):

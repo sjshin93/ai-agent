@@ -18,6 +18,8 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _auth = AuthService();
   String? _errorMessage;
+  static const _googleRed = Color(0xFFDB4437);
+  static const _googleRedBorder = Color(0xFFF2C9C5);
 
   @override
   void initState() {
@@ -38,7 +40,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted || !me.authenticated) {
         return;
       }
-      SessionService.setUsername(me.username ?? 'google-user');
+      SessionService.setUsername(me.userId ?? 'unknown-user');
       SessionService.setAccessToken(null);
       Navigator.of(context).pushReplacementNamed(AppRoutes.main);
     } catch (_) {
@@ -79,11 +81,35 @@ class _LoginPageState extends State<LoginPage> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
-                  BsButton(
-                    onPressed: _continueWithGoogleLogin,
-                    label: 'Continue with Google',
-                    outline: true,
-                    fullWidth: true,
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _continueWithGoogleLogin,
+                      icon: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: _googleRed,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      label: const Text(
+                        'Continue with Google',
+                        style: TextStyle(
+                          color: _googleRed,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: _googleRed,
+                        side: const BorderSide(color: _googleRedBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   BsButton(

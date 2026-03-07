@@ -56,14 +56,15 @@ class SessionAuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Authentication required"},
             )
 
-        username = await self._session_manager.validate_and_touch(session_id)
-        if not username:
+        user_id = await self._session_manager.validate_and_touch(session_id)
+        if not user_id:
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Session expired. Please sign in again."},
             )
 
-        request.state.username = username
+        request.state.user_id = user_id
+        request.state.username = user_id
         request.state.session_id = session_id
         started = time.perf_counter()
         response = await call_next(request)
@@ -72,7 +73,7 @@ class SessionAuthMiddleware(BaseHTTPMiddleware):
         user_agent = request.headers.get("user-agent", "")
         try:
             await self._session_manager.record_activity(
-                username=username,
+                user_id=user_id,
                 session_id=session_id,
                 method=request.method,
                 path=request.url.path,

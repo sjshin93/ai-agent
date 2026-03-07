@@ -17,7 +17,7 @@ class BootstrapTheme {
       surface: Colors.white,
       background: BootstrapColors.background,
       error: BootstrapColors.danger,
-      onPrimary: Colors.white,
+      onPrimary: BootstrapColors.text,
       onSecondary: Colors.white,
       onSurface: BootstrapColors.text,
       onBackground: BootstrapColors.text,

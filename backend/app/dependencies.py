@@ -20,6 +20,7 @@ def get_llm_client() -> LlmClient:
         api_key=settings.openwebui_api_key or settings.llm_api_key,
         chat_path=settings.openwebui_chat_path,
         default_model=settings.openwebui_default_model,
+        gemini_api_key=settings.gemini_api_key,
     )
 
 

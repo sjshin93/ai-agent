@@ -24,6 +24,12 @@ _KAKAO_USERINFO_URL = "https://kapi.kakao.com/v2/user/me"
 _KAKAO_STATE_COOKIE = "oauth_state_kakao"
 
 
+def _role_for_user_id(user_id: str) -> str:
+    if user_id in settings.admin_user_ids:
+        return "admin"
+    return "user"
+
+
 def _set_session_cookie(response: Response, session_id: str) -> None:
     response.set_cookie(
         key=settings.session_cookie_name,
@@ -66,10 +72,11 @@ async def me(request: Request):
     session_id = request.cookies.get(settings.session_cookie_name)
     if not session_id:
         return MeResponse(authenticated=False)
-    username = await session_manager.validate_and_touch(session_id)
-    if not username:
+    user_id = await session_manager.validate_and_touch(session_id)
+    if not user_id:
         return MeResponse(authenticated=False)
-    return MeResponse(authenticated=True, username=username)
+    nickname = await session_manager.get_user_nickname(user_id)
+    return MeResponse(authenticated=True, user_id=user_id, nickname=nickname)
 
 
 @router.post("/logout", response_model=LogoutResponse)
@@ -142,17 +149,26 @@ async def google_callback(
             )
             userinfo_res.raise_for_status()
             userinfo = userinfo_res.json()
+            logger.info("Google OAuth userinfo: %s", userinfo)
     except Exception as exc:
         logger.warning("Google OAuth callback failed: %s", exc)
         return failure_redirect
 
-    email = str(userinfo.get("email") or "").strip()
     sub = str(userinfo.get("sub") or "").strip()
-    username = email or sub
-    if not username:
+    name = str(userinfo.get("name") or "").strip()
+    if not sub:
         return failure_redirect
+    user_id = f"google_{sub}"
+    nickname = name or user_id
+    await session_manager.upsert_user(
+        user_id=user_id,
+        provider="google",
+        provider_user_id=sub,
+        role=_role_for_user_id(user_id),
+        nickname=nickname,
+    )
 
-    session_id = await session_manager.create_session(username)
+    session_id = await session_manager.create_session(user_id)
     success_redirect = _redirect(settings.google_success_redirect)
     _set_session_cookie(success_redirect, session_id)
     success_redirect.delete_cookie(_GOOGLE_STATE_COOKIE, path="/")
@@ -173,7 +189,7 @@ async def kakao_login():
             "client_id": settings.kakao_rest_api_key,
             "redirect_uri": settings.kakao_redirect_uri,
             "response_type": "code",
-            "scope": "account_email profile_nickname",
+            "scope": "profile_nickname",
             "prompt": "login",
         },
     )
@@ -219,20 +235,27 @@ async def kakao_callback(
             )
             userinfo_res.raise_for_status()
             userinfo = userinfo_res.json()
+            logger.info("Kakao OAuth userinfo: %s", userinfo)
     except Exception as exc:
         logger.warning("Kakao OAuth callback failed: %s", exc)
         return failure_redirect
 
-    kakao_account = userinfo.get("kakao_account") or {}
     properties = userinfo.get("properties") or {}
-    email = str(kakao_account.get("email") or "").strip()
     nickname = str(properties.get("nickname") or "").strip()
     kakao_id = str(userinfo.get("id") or "").strip()
-    username = email or nickname or kakao_id
-    if not username:
+    if not kakao_id:
         return failure_redirect
+    user_id = f"kakao_{kakao_id}"
+    saved_nickname = nickname or user_id
+    await session_manager.upsert_user(
+        user_id=user_id,
+        provider="kakao",
+        provider_user_id=kakao_id,
+        role=_role_for_user_id(user_id),
+        nickname=saved_nickname,
+    )
 
-    session_id = await session_manager.create_session(username)
+    session_id = await session_manager.create_session(user_id)
     success_redirect = _redirect(settings.kakao_success_redirect)
     _set_session_cookie(success_redirect, session_id)
     success_redirect.delete_cookie(_KAKAO_STATE_COOKIE, path="/")
