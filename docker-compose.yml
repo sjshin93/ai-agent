@@ -32,8 +32,8 @@ services:
       # - "C:\\Users\\G3A230206\\Desktop\\company\\keyTokens/bas-key-new.pem:/app/keys/bas-key-new.pem:ro"
       # - "C:\\Users\\G3A230206\\Desktop\\company\\keyTokens/collection.json:/app/collection.json:ro"
 
-      # ubuntu - sjshin
-      - ${COLLECTION_FILE}:${COLLECTION_PATH}:ro
+      # Optional override via .env; defaults keep compose bootable.
+      - ${COLLECTION_FILE:-./backend/collection.json}:${COLLECTION_PATH:-/app/collection.json}:ro
     command:
       [
         "uvicorn",

@@ -6,7 +6,8 @@ SSH execution, Jira integration, and LLM utilities.
 
 ## Architecture
 
-Project architecture image: `docs/architecture.png`
+![Project architecture image](docs/architecture.png)
+
 
 ## Features
 
@@ -38,6 +39,9 @@ Important groups:
 - Files/Paths: `COLLECTION_FILE`, `COLLECTION_PATH`, `AWS_SSH_KEY_PATH`, `AWS_SSH_ALIASES_PATH`
 - Integrations: `JIRA_*`, `SLACK_WEBHOOK_URL`, `LLM_*`, `OPENWEBUI_*`
 - Server: `SERVER_HOST`, `SERVER_PORT`
+
+`COLLECTION_FILE` / `COLLECTION_PATH` are optional now. If omitted, compose uses
+`./backend/collection.json` -> `/app/collection.json`.
 
 ### Run / Build
 
