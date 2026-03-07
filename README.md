@@ -11,7 +11,7 @@ SSH execution, Jira integration, and LLM utilities.
 
 ## Features
 
-- Login/session flow for local app entry
+- SNS login with Google and Kakao (OAuth 2.0)
 - API collection test runner
 - Jira issue creation (including attachments)
 - Activity/session logging
@@ -38,6 +38,7 @@ Important groups:
 - Storage: `POSTGRES_DSN`, `POSTGRES_POOL_*`, `REDIS_URL`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - Files/Paths: `COLLECTION_FILE`, `COLLECTION_PATH`, `AWS_SSH_KEY_PATH`, `AWS_SSH_ALIASES_PATH`
 - Integrations: `JIRA_*`, `SLACK_WEBHOOK_URL`, `LLM_*`, `OPENWEBUI_*`
+- Auth: `GOOGLE_*`, `KAKAO_*`
 - Server: `SERVER_HOST`, `SERVER_PORT`
 
 `COLLECTION_FILE` / `COLLECTION_PATH` are optional now. If omitted, compose uses
@@ -48,6 +49,24 @@ Important groups:
 ```bash
 docker compose up --build
 ```
+
+### Google Login Setup
+
+1. Create OAuth client in Google Cloud Console (Web application).
+2. Add authorized redirect URI: `http://localhost:8080/api/auth/google/callback`
+3. Fill `.env` with:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REDIRECT_URI` (same as above unless changed)
+
+### Kakao Login Setup
+
+1. Create app in Kakao Developers and enable Kakao Login.
+2. Add Redirect URI: `http://localhost:8080/api/auth/kakao/callback`
+3. Fill `.env` with:
+   - `KAKAO_REST_API_KEY`
+   - `KAKAO_CLIENT_SECRET` (if enabled in Kakao security settings)
+   - `KAKAO_REDIRECT_URI` (same as above unless changed)
 
 ### Flutter Build Notes
 

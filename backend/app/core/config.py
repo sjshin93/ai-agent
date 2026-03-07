@@ -102,6 +102,22 @@ class Settings:
     session_cookie_name: str = _get("SESSION_COOKIE_NAME", "session_id")
     session_cookie_secure: bool = _get_bool("SESSION_COOKIE_SECURE", False)
     oauth_token_url: str = _get("OAUTH_TOKEN_URL", "")
+    google_client_id: str = _get("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = _get("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri: str = _get(
+        "GOOGLE_REDIRECT_URI",
+        "http://localhost:8080/api/auth/google/callback",
+    )
+    google_success_redirect: str = _get("GOOGLE_SUCCESS_REDIRECT", "/login?google=ok")
+    google_failure_redirect: str = _get("GOOGLE_FAILURE_REDIRECT", "/login?google=error")
+    kakao_rest_api_key: str = _get("KAKAO_REST_API_KEY", "")
+    kakao_client_secret: str = _get("KAKAO_CLIENT_SECRET", "")
+    kakao_redirect_uri: str = _get(
+        "KAKAO_REDIRECT_URI",
+        "http://localhost:8080/api/auth/kakao/callback",
+    )
+    kakao_success_redirect: str = _get("KAKAO_SUCCESS_REDIRECT", "/login?kakao=ok")
+    kakao_failure_redirect: str = _get("KAKAO_FAILURE_REDIRECT", "/login?kakao=error")
     collection_path: str = _get("COLLECTION_PATH", "")
     collection_base_url: str = _get("COLLECTION_BASE_URL", "")
     collection_log_path: str = _get("COLLECTION_LOG_PATH", "data/api_test.log")

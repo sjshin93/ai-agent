@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../routes.dart';
+import '../../services/auth_service.dart';
+import '../../services/browser_redirect.dart';
 import '../../services/session_service.dart';
 import '../../widgets/bs/bs_button.dart';
 import '../../widgets/bs/bs_card.dart';
 import '../../widgets/bs/bs_text.dart';
-import '../../widgets/bs/bs_text_field.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,25 +16,42 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _userController = TextEditingController();
+  final _auth = AuthService();
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _userController.text = SessionService.getUsername() ?? '';
+    final googleStatus = Uri.base.queryParameters['google'];
+    final kakaoStatus = Uri.base.queryParameters['kakao'];
+    if (googleStatus == 'error') {
+      _errorMessage = 'Google login failed. Please verify OAuth settings.';
+    } else if (kakaoStatus == 'error') {
+      _errorMessage = 'Kakao login failed. Please verify OAuth settings.';
+    }
+    _restoreSessionIfExists();
   }
 
-  @override
-  void dispose() {
-    _userController.dispose();
-    super.dispose();
+  Future<void> _restoreSessionIfExists() async {
+    try {
+      final me = await _auth.me();
+      if (!mounted || !me.authenticated) {
+        return;
+      }
+      SessionService.setUsername(me.username ?? 'google-user');
+      SessionService.setAccessToken(null);
+      Navigator.of(context).pushReplacementNamed(AppRoutes.main);
+    } catch (_) {
+      // Ignore. User can still login manually.
+    }
   }
 
-  void _continueWithoutCompanyLogin() {
-    final username = _userController.text.trim();
-    SessionService.setUsername(username.isEmpty ? 'local-user' : username);
-    SessionService.setAccessToken(null);
-    Navigator.of(context).pushReplacementNamed(AppRoutes.main);
+  void _continueWithGoogleLogin() {
+    redirectTo('/api/auth/google/login');
+  }
+
+  void _continueWithKakaoLogin() {
+    redirectTo('/api/auth/kakao/login');
   }
 
   @override
@@ -56,21 +74,31 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 8),
                   const BsText(
-                    'Company-specific auth has been removed.',
+                    'Sign in with Google or Kakao.',
                     variant: BsTextVariant.muted,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 16),
-                  BsTextField(
-                    controller: _userController,
-                    label: 'Username (optional)',
-                  ),
                   const SizedBox(height: 12),
                   BsButton(
-                    onPressed: _continueWithoutCompanyLogin,
-                    label: 'Continue',
+                    onPressed: _continueWithGoogleLogin,
+                    label: 'Continue with Google',
+                    outline: true,
                     fullWidth: true,
                   ),
+                  const SizedBox(height: 8),
+                  BsButton(
+                    onPressed: _continueWithKakaoLogin,
+                    label: 'Continue with Kakao',
+                    fullWidth: true,
+                  ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    BsText(
+                      _errorMessage!,
+                      variant: BsTextVariant.muted,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ],
               ),
             ),

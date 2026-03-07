@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../routes.dart';
+import '../../services/auth_service.dart';
 import 'services/config_service.dart';
 import 'services/llm_service.dart';
 import 'services/slack_notification_service.dart';
@@ -28,6 +29,7 @@ class _MainPageState extends State<MainPage>
   final _ssh = SshService();
   final _llm = LlmService();
   final _config = ConfigService();
+  final _auth = AuthService();
   final _focusNode = FocusNode();
   Timer? _idleTimer;
   Timer? _countdownTimer;
@@ -131,6 +133,11 @@ class _MainPageState extends State<MainPage>
   Future<void> _logoutAndNavigate() async {
     if (!mounted) {
       return;
+    }
+    try {
+      await _auth.logout();
+    } catch (_) {
+      // Keep local logout behavior even if server call fails.
     }
     SessionService.setUsername(null);
     SessionService.setAccessToken(null);

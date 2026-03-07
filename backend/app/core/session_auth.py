@@ -15,6 +15,11 @@ _PUBLIC_PATHS = {
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/auth/me",
+    "/auth/google/login",
+    "/auth/google/callback",
+    "/auth/kakao/login",
+    "/auth/kakao/callback",
     "/config/auto-logout",
     "/config/version",
 }

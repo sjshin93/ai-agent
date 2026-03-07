@@ -16,6 +16,7 @@ app = FastAPI(
     ),
     openapi_tags=[
         {"name": "config", "description": "Runtime config and session heartbeat."},
+        {"name": "auth", "description": "Google/Kakao OAuth sign-in/out."},
         {"name": "collection", "description": "Collection list and execution."},
         {"name": "ssh", "description": "SSH command execution via bastion flow."},
         {"name": "llm", "description": "LLM query endpoint."},
