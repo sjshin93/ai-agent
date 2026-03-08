@@ -1,4 +1,4 @@
-name: dev_base_kit
+name: MongMind
 services:
   web:
     build:

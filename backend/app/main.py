@@ -9,10 +9,10 @@ from app.domains.collection.service import load_collection
 
 app = FastAPI(
     root_path="/api",
-    title="Flutter FastAPI Compose Sample API",
+    title="MongMind",
     version=settings.version,
     description=(
-        "Internal API for collection test, SSH, LLM, and Slack notification."
+        "Internal API for the MongMind platform, covering collection test, SSH, LLM, and Slack notification."
     ),
     openapi_tags=[
         {"name": "admin", "description": "Admin-only user management endpoints."},

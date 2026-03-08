@@ -9,7 +9,7 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter + FastAPI (Compose)',
+      title: 'MongMind',
       theme: BootstrapTheme.light(),
       initialRoute: AppRoutes.login,
       routes: AppRoutes.build(),
