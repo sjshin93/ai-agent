@@ -489,6 +489,104 @@ class SessionManager:
             )
         return [dict(row) for row in rows]
 
+    async def fetch_user_activity_logs(
+        self,
+        *,
+        log_type: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        pool, _ = self._require_ready()
+        where_clauses: list[str] = []
+        if log_type == 'system':
+            where_clauses.append("path NOT LIKE '/api/%'")
+        elif log_type == 'api':
+            where_clauses.append("path LIKE '/api/%'")
+        elif log_type == 'error':
+            where_clauses.append('status_code >= 500')
+        where_sql = ''
+        if where_clauses:
+            where_sql = 'WHERE ' + ' AND '.join(where_clauses)
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                f"""
+                SELECT
+                  occurred_at,
+                  user_id,
+                  session_id,
+                  method,
+                  path,
+                  status_code,
+                  duration_ms,
+                  client_ip,
+                  user_agent
+                FROM user_activity_logs
+                {where_sql}
+                ORDER BY occurred_at DESC
+                LIMIT $1
+                """,
+                limit,
+            )
+        return [dict(row) for row in rows]
+
+    async def count_users(self) -> int:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            value = await conn.fetchval('SELECT COUNT(*) FROM users')
+        return int(value or 0)
+
+    async def count_unique_visitors_since(self, since: datetime) -> int:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            value = await conn.fetchval(
+                """
+                SELECT COUNT(DISTINCT user_id)
+                FROM user_activity_logs
+                WHERE occurred_at >= $1
+                """,
+                since,
+            )
+        return int(value or 0)
+
+    async def count_api_calls_since(self, since: datetime) -> int:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            value = await conn.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM user_activity_logs
+                WHERE occurred_at >= $1
+                """,
+                since,
+            )
+        return int(value or 0)
+
+    async def aggregate_api_calls_by_hour(
+        self,
+        *,
+        since: datetime,
+    ) -> list[dict]:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                  date_trunc('hour', occurred_at) AS bucket,
+                  COUNT(*) AS count
+                FROM user_activity_logs
+                WHERE occurred_at >= $1
+                GROUP BY bucket
+                ORDER BY bucket ASC
+                """,
+                since,
+            )
+        return [
+            {
+                'bucket': row['bucket'],
+                'count': int(row['count'] or 0),
+            }
+            for row in rows
+        ]
+
     async def record_llm_chat(
         self,
         *,

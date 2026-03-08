@@ -1,4 +1,5 @@
 import logging
+import time
 
 from fastapi import APIRouter, Depends, Request
 
@@ -21,7 +22,12 @@ async def query_llm(
 ):
     client_ip = request.client.host if request and request.client else "unknown"
     user_id = await _resolve_user_id(request, sessions) if request else "anonymous"
+    session_cookie = (
+        request.cookies.get(settings.session_cookie_name) if request else None
+    )
+    start = time.perf_counter()
     output = await service.query(prompt=payload.prompt, model=payload.model)
+    duration_ms = int((time.perf_counter() - start) * 1000)
     model_name = (payload.model or "").strip() or "gemini-flash-latest"
     try:
         await sessions.record_llm_chat(
@@ -43,6 +49,22 @@ async def query_llm(
             "output_length": len(output),
         },
     )
+    if session_cookie is not None and user_id != "anonymous":
+        try:
+            await sessions.record_activity(
+                user_id=user_id,
+                session_id=session_cookie,
+                method=request.method if request else "POST",
+                path=request.url.path if request else "/llm/query",
+                status_code=200,
+                duration_ms=duration_ms,
+                client_ip=client_ip,
+                user_agent=request.headers.get("user-agent", "")
+                if request
+                else "",
+            )
+        except Exception as exc:
+            logger.warning("Failed to persist activity log for LLM query: %s", exc)
     return LlmQueryResponse(output=output)
 
 

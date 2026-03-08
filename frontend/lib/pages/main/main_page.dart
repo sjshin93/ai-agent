@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -658,6 +659,8 @@ class _AdminWorkspace extends StatefulWidget {
 
 class _AdminWorkspaceState extends State<_AdminWorkspace> {
   static const _tabs = [
+    'Logs',
+    'Dashboard',
     'Users',
     'API Test',
   ];
@@ -666,7 +669,16 @@ class _AdminWorkspaceState extends State<_AdminWorkspace> {
   @override
   void initState() {
     super.initState();
-    widget.onContextChanged('Admin - Users');
+    widget.onContextChanged('Admin - ${_tabs[_selectedIndex]}');
+  }
+
+  void _selectTab(int index) {
+    if (_selectedIndex == index) {
+      return;
+    }
+    final label = _tabs[index];
+    setState(() => _selectedIndex = index);
+    widget.onContextChanged('Admin - $label');
   }
 
   @override
@@ -683,10 +695,7 @@ class _AdminWorkspaceState extends State<_AdminWorkspace> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: BsButton(
-                  onPressed: () {
-                    setState(() => _selectedIndex = i);
-                    widget.onContextChanged('Admin - ${_tabs[_selectedIndex]}');
-                  },
+                  onPressed: () => _selectTab(i),
                   label: _tabs[i],
                   fullWidth: true,
                   outline: i != _selectedIndex,
@@ -698,11 +707,402 @@ class _AdminWorkspaceState extends State<_AdminWorkspace> {
       right: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_selectedIndex == 0) const _AdminUsersPane(),
-          if (_selectedIndex == 1) const ApiTestTab(),
+          if (_selectedIndex == 0) const _AdminLogsPane(),
+          if (_selectedIndex == 1) const _AdminStatsPane(),
+          if (_selectedIndex == 2) const _AdminUsersPane(),
+          if (_selectedIndex == 3) const ApiTestTab(),
         ],
       ),
     );
+  }
+}
+
+class _AdminLogsPane extends StatefulWidget {
+  const _AdminLogsPane();
+
+  @override
+  State<_AdminLogsPane> createState() => _AdminLogsPaneState();
+}
+
+class _AdminLogsPaneState extends State<_AdminLogsPane> {
+  static const _logTypeLabels = {
+    'system': 'System',
+    'api': 'API',
+    'error': 'Error',
+  };
+
+  final _admin = AdminService();
+  bool _isLoading = true;
+  String _logType = 'system';
+  String? _error;
+  List<AdminLogEntry> _entries = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogs();
+  }
+
+  Future<void> _loadLogs() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final entries = await _admin.fetchLogs(_logType);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _entries = entries;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _setLogType(String type) {
+    if (_logType == type) {
+      return;
+    }
+    setState(() => _logType = type);
+    _loadLogs();
+  }
+
+  String _formatTimestamp(DateTime time) {
+    final local = time.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    final second = local.second.toString().padLeft(2, '0');
+    return '$hour:$minute:$second';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const BsText('Logs', variant: BsTextVariant.subtitle),
+              BsButton(
+                onPressed: _isLoading ? null : _loadLogs,
+                label: 'Refresh',
+                outline: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: _logTypeLabels.entries.map((entry) {
+              final isSelected = entry.key == _logType;
+              return BsButton(
+                onPressed: () => _setLogType(entry.key),
+                label: entry.value,
+                outline: !isSelected,
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            BsText(_error!, variant: BsTextVariant.muted),
+          ],
+          if (!_isLoading && _error == null && _entries.isEmpty) ...[
+            const SizedBox(height: 8),
+            const BsText('No log entries yet.', variant: BsTextVariant.muted),
+          ],
+          if (!_isLoading && _error == null && _entries.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 320,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _entries.length,
+                separatorBuilder: (_, __) => const Divider(),
+                itemBuilder: (context, index) {
+                  final entry = _entries[index];
+                  final statusColor = entry.statusCode >= 500
+                      ? Theme.of(context).colorScheme.error
+                      : entry.statusCode >= 400
+                          ? Theme.of(context)
+                              .colorScheme
+                              .error
+                              .withOpacity(0.75)
+                          : Theme.of(context).colorScheme.primary;
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Text(
+                      _formatTimestamp(entry.occurredAt),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    title: Text(
+                      '${entry.method} ${entry.path}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      'User: ${entry.userId.isEmpty ? 'anonymous' : entry.userId} • '
+                      'IP: ${entry.clientIp}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          entry.statusCode.toString(),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: statusColor),
+                        ),
+                        Text(
+                          '${entry.durationMs} ms',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminStatsPane extends StatefulWidget {
+  const _AdminStatsPane();
+
+  @override
+  State<_AdminStatsPane> createState() => _AdminStatsPaneState();
+}
+
+class _AdminStatsPaneState extends State<_AdminStatsPane> {
+  final _admin = AdminService();
+  bool _isLoading = true;
+  String? _error;
+  AdminStats? _stats;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final stats = await _admin.fetchStats();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _stats = stats;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const BsText('Dashboard', variant: BsTextVariant.subtitle),
+              BsButton(
+                onPressed: _isLoading ? null : _loadStats,
+                label: 'Refresh',
+                outline: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            BsText(_error!, variant: BsTextVariant.muted),
+          ],
+          if (_stats != null) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                _MetricBadge(
+                  label: '가입자 수',
+                  value: _stats!.subscriberCount,
+                ),
+                _MetricBadge(
+                  label: '접속자 수',
+                  value: _stats!.visitorCount,
+                ),
+                _MetricBadge(
+                  label: 'API 호출량',
+                  value: _stats!.apiCallCount,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const BsText('Traffic (hourly)', variant: BsTextVariant.caption),
+            const SizedBox(height: 12),
+            _TrafficGraph(_stats!.traffic),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricBadge extends StatelessWidget {
+  const _MetricBadge({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final int value;
+
+  String get _formattedValue {
+    final text = value.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (var i = text.length - 1; i >= 0; i--) {
+      if (count == 3) {
+        buffer.write(',');
+        count = 0;
+      }
+      buffer.write(text[i]);
+      count += 1;
+    }
+    return buffer.toString().split('').reversed.join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    final textColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.7);
+    return Container(
+      constraints: const BoxConstraints(minWidth: 140),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _formattedValue,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: color, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: textColor,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrafficGraph extends StatelessWidget {
+  const _TrafficGraph(this.traffic);
+
+  final List<TrafficPoint> traffic;
+
+  @override
+  Widget build(BuildContext context) {
+    if (traffic.isEmpty) {
+      return const BsText('Traffic data unavailable.', variant: BsTextVariant.muted);
+    }
+    final maxCalls = traffic.fold<int>(
+      0,
+      (prev, element) => math.max(prev, element.apiCalls),
+    );
+    return SizedBox(
+      height: 180,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: traffic.map((point) {
+          final ratio = maxCalls > 0 ? point.apiCalls / maxCalls : 0;
+          final barHeight = (ratio * 120).clamp(8.0, 140.0).toDouble();
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    point.apiCalls.toString(),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: barHeight,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _hourLabel(point.timestamp),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  static String _hourLabel(DateTime timestamp) {
+    final local = timestamp.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:00';
   }
 }
 
