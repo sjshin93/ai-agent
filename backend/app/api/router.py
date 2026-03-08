@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.admin.router import router as admin_router
+from app.api.v1.archive.router import router as archive_router
 from app.api.v1.auth.router import router as auth_router
 from app.api.v1.collection.router import router as collection_router
 from app.api.v1.config.router import router as config_router
@@ -20,3 +21,4 @@ api_router.include_router(
     tags=["slack-notification"],
 )
 api_router.include_router(llm_router, prefix="/llm", tags=["llm"])
+api_router.include_router(archive_router, prefix="/archive", tags=["archive"])

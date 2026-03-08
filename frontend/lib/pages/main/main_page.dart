@@ -7,10 +7,13 @@ import '../../routes.dart';
 import '../../services/auth_service.dart';
 import 'services/admin_service.dart';
 import 'services/config_service.dart';
+import 'services/diary_service.dart';
 import 'services/llm_service.dart';
 import 'services/slack_notification_service.dart';
 import 'api_test_tab.dart';
 import '../../services/session_service.dart';
+import '../../ui/bootstrap_colors.dart';
+import '../../widgets/bs/bs_alert.dart';
 import '../../widgets/bs/bs_button.dart';
 import '../../widgets/bs/bs_card.dart';
 import '../../widgets/bs/bs_select.dart';
@@ -597,6 +600,10 @@ class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
 
   @override
   Widget build(BuildContext context) {
+    final isDiaryTab = _archives[_selectedIndex] == 'Archive-Diary';
+    final helpMessage = isDiaryTab
+        ? 'Diary entries follow the template provided on the left and are stored as raw text under /archive/{person_id}/memory/raw/.'
+        : 'Browse archive categories from the left sub tabs.';
     return _TwoPaneLayout(
       leftWidth: 230,
       left: BsCard(
@@ -626,20 +633,22 @@ class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
       right: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PageHelpBox(
-            message: 'Browse archive categories from the left sub tabs.',
-          ),
+          PageHelpBox(message: helpMessage),
           const SizedBox(height: 16),
-          BsCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const BsText('Selected Archive', variant: BsTextVariant.subtitle),
-                const SizedBox(height: 8),
-                BsText(_archives[_selectedIndex]),
-              ],
+          if (isDiaryTab)
+            _ArchiveDiaryPane(onContextChanged: widget.onContextChanged)
+          else
+            BsCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const BsText('Selected Archive',
+                      variant: BsTextVariant.subtitle),
+                  const SizedBox(height: 8),
+                  BsText(_archives[_selectedIndex]),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -713,6 +722,300 @@ class _AdminWorkspaceState extends State<_AdminWorkspace> {
           if (_selectedIndex == 3) const ApiTestTab(),
         ],
       ),
+    );
+  }
+}
+
+class _ArchiveDiaryPane extends StatefulWidget {
+  const _ArchiveDiaryPane({
+    required this.onContextChanged,
+  });
+
+  final ValueChanged<String> onContextChanged;
+
+  @override
+  State<_ArchiveDiaryPane> createState() => _ArchiveDiaryPaneState();
+}
+
+class _ArchiveDiaryPaneState extends State<_ArchiveDiaryPane> {
+  static const _emotionLabels = [
+    'joy',
+    'happy',
+    'excited',
+    'grateful',
+    'calm',
+    'hopeful',
+    'proud',
+    'loved',
+    'sad',
+    'lonely',
+    'disappointed',
+    'regretful',
+    'ashamed',
+    'angry',
+    'frustrated',
+    'annoyed',
+    'anxious',
+    'afraid',
+    'stressed',
+    'confused',
+  ];
+
+  final _diaryService = const DiaryService();
+  final _eventController = TextEditingController();
+  final _feelingController = TextEditingController();
+  final _reasonController = TextEditingController();
+  final _nextActionController = TextEditingController();
+  DateTime _eventDate = DateTime.now();
+  String? _emotionLabel;
+  bool _isSubmitting = false;
+  String? _statusMessage;
+  BsVariant _statusVariant = BsVariant.info;
+  DiaryArchiveResponse? _response;
+
+  @override
+  void dispose() {
+    _eventController.dispose();
+    _feelingController.dispose();
+    _reasonController.dispose();
+    _nextActionController.dispose();
+    super.dispose();
+  }
+
+  void _handleDateTap() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _eventDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (picked != null) {
+      setState(() => _eventDate = picked);
+    }
+  }
+
+  String _formatDate(DateTime value) {
+    final year = value.year.toString().padLeft(4, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    final day = value.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
+  String _formatTimestamp(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${_formatDate(local)} $hour:$minute';
+  }
+
+  String _buildRawText({
+    required String eventText,
+    required String feelingText,
+    required String reasonText,
+    required String nextActionText,
+  }) {
+    return [
+      '<일기>',
+      '날짜:${_formatDate(_eventDate)}',
+      '대표감정:${_emotionLabel ?? ''}',
+      '있었던 일:$eventText',
+      '느낀 감정:$feelingText',
+      '그 이유:$reasonText',
+      '앞으로 어떻게 하고 싶은지:$nextActionText',
+    ].join('\n');
+  }
+
+  Future<void> _submit() async {
+    final eventText = _eventController.text.trim();
+    final feelingText = _feelingController.text.trim();
+    final reasonText = _reasonController.text.trim();
+    final nextActionText = _nextActionController.text.trim();
+    final rawText = _buildRawText(
+      eventText: eventText,
+      feelingText: feelingText,
+      reasonText: reasonText,
+      nextActionText: nextActionText,
+    );
+    setState(() {
+      _isSubmitting = true;
+      _statusMessage = null;
+    });
+    try {
+      final result = await _diaryService.archiveDiary(
+        eventDate: _eventDate,
+        rawText: rawText,
+        emotionLabel: _emotionLabel,
+        eventText: eventText.isEmpty ? null : eventText,
+        feelingText: feelingText.isEmpty ? null : feelingText,
+        reasonText: reasonText.isEmpty ? null : reasonText,
+        nextActionText: nextActionText.isEmpty ? null : nextActionText,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _response = result;
+        _statusMessage = 'Diary saved (${_formatDate(result.eventDate)})';
+        _statusVariant = BsVariant.success;
+      });
+      widget.onContextChanged(
+        'Archives - Archive-Diary saved ${_formatDate(result.eventDate)}',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusMessage = 'Failed to archive diary: ${error.toString()}';
+        _statusVariant = BsVariant.danger;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final eventText = _eventController.text.trim();
+    final feelingText = _feelingController.text.trim();
+    final reasonText = _reasonController.text.trim();
+    final nextActionText = _nextActionController.text.trim();
+    final rawPreview = _buildRawText(
+      eventText: eventText,
+      feelingText: feelingText,
+      reasonText: reasonText,
+      nextActionText: nextActionText,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        BsCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const BsText('Archive-diary', variant: BsTextVariant.subtitle),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const BsText('날짜', variant: BsTextVariant.body),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: BsButton(
+                      onPressed: _handleDateTap,
+                      label: _formatDate(_eventDate),
+                      outline: true,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              BsSelect<String?>(
+                label: '대표감정 (선택)',
+                value: _emotionLabel,
+                onChanged: (value) => setState(() => _emotionLabel = value),
+                helperText: 'Optional emotion tag for this entry',
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('선택하지 않음'),
+                  ),
+                  ..._emotionLabels.map(
+                    (label) => DropdownMenuItem<String?>(
+                      value: label,
+                      child: Text(label),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              BsTextField(
+                label: '있었던 일',
+                controller: _eventController,
+                maxLines: 3,
+                helperText: '오늘 무엇이 있었는지 간단하게 작성하세요.',
+              ),
+              const SizedBox(height: 12),
+              BsTextField(
+                label: '느낀 감정',
+                controller: _feelingController,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              BsTextField(
+                label: '그 이유',
+                controller: _reasonController,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              BsTextField(
+                label: '앞으로 어떻게 하고 싶은지',
+                controller: _nextActionController,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              BsButton(
+                onPressed: _isSubmitting ? null : _submit,
+                label: _isSubmitting ? 'Archiving...' : 'Archive diary',
+                fullWidth: true,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        BsCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const BsText('Raw preview', variant: BsTextVariant.subtitle),
+              const SizedBox(height: 8),
+              SelectableText(
+                rawPreview,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+        if (_statusMessage != null) ...[
+          const SizedBox(height: 12),
+          BsAlert(
+            message: _statusMessage!,
+            variant: _statusVariant,
+          ),
+        ],
+        if (_response != null) ...[
+          const SizedBox(height: 12),
+          BsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const BsText('Last archive', variant: BsTextVariant.subtitle),
+                const SizedBox(height: 8),
+                Text('ID: ${_response!.id}', style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  'Event date: ${_formatDate(_response!.eventDate)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  'Stored at: ${_response!.storagePath}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  'SHA256: ${_response!.sha256}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'Created at: ${_formatTimestamp(_response!.createdAt)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import asyncpg
 from redis import asyncio as redis_async
@@ -114,6 +114,29 @@ class SessionManager:
                         """
                         CREATE INDEX IF NOT EXISTS llm_chat_logs_user_time_idx
                         ON llm_chat_logs(user_id, occurred_at DESC)
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS diary_entries (
+                          id UUID PRIMARY KEY,
+                          person_id TEXT NOT NULL,
+                          storage_path TEXT NOT NULL,
+                          created_at TIMESTAMPTZ NOT NULL,
+                          sha256 TEXT NOT NULL,
+                          event_date DATE NOT NULL,
+                          emotion_label TEXT,
+                          event_text TEXT,
+                          feeling_text TEXT,
+                          reason_text TEXT,
+                          next_action_text TEXT
+                        )
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS diary_entries_person_sha256_idx
+                        ON diary_entries(person_id, sha256)
                         """
                     )
                     await conn.execute(
@@ -615,3 +638,68 @@ class SessionManager:
                 prompt,
                 response,
             )
+
+    async def diary_entry_exists(self, person_id: str, sha256: str) -> bool:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            value = await conn.fetchval(
+                """
+                SELECT 1
+                FROM diary_entries
+                WHERE person_id = $1
+                  AND sha256 = $2
+                LIMIT 1
+                """,
+                person_id,
+                sha256,
+            )
+        return value is not None
+
+    async def insert_diary_entry(
+        self,
+        *,
+        entry_id: uuid.UUID,
+        person_id: str,
+        storage_path: str,
+        created_at: datetime,
+        sha256: str,
+        event_date: date | None,
+        emotion_label: str | None,
+        event_text: str | None,
+        feeling_text: str | None,
+        reason_text: str | None,
+        next_action_text: str | None,
+    ) -> dict:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO diary_entries (
+                  id,
+                  person_id,
+                  storage_path,
+                  created_at,
+                  sha256,
+                  event_date,
+                  emotion_label,
+                  event_text,
+                  feeling_text,
+                  reason_text,
+                  next_action_text
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                RETURNING *
+                """,
+                entry_id,
+                person_id,
+                storage_path,
+                created_at,
+                sha256,
+                event_date,
+                emotion_label,
+                event_text,
+                feeling_text,
+                reason_text,
+                next_action_text,
+            )
+        return dict(row) if row is not None else {}

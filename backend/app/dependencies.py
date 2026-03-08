@@ -1,4 +1,7 @@
 from app.core.config import settings
+from pathlib import Path
+
+from app.domains.diary.service import DiaryService
 from app.domains.llm.client import LlmClient
 from app.domains.llm.service import LlmService
 from app.domains.slack_notification.client import SlackClient
@@ -28,6 +31,14 @@ def get_slack_notification_service() -> SlackNotificationService:
 
 def get_llm_service() -> LlmService:
     return LlmService(llm_client=get_llm_client())
+
+def get_diary_service() -> DiaryService:
+    archive_root = Path(settings.archive_root_path).expanduser()
+    return DiaryService(
+        session_manager=get_session_manager(),
+        archive_root=archive_root,
+        public_root=settings.archive_public_path,
+    )
 
 def get_ssh_service() -> SshService:
     return SshService()

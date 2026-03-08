@@ -136,6 +136,8 @@ class Settings:
     collection_path: str = _get("COLLECTION_PATH", "")
     collection_base_url: str = _get("COLLECTION_BASE_URL", "")
     collection_log_path: str = _get("COLLECTION_LOG_PATH", "data/api_test.log")
+    archive_root_path: str = _get("ARCHIVE_ROOT_PATH", "./archive")
+    archive_public_path: str = _get("ARCHIVE_PUBLIC_PATH", "/archive")
     aws_ssh_host: str = _get("AWS_SSH_HOST", "")
     aws_ssh_port: int = _get_int("AWS_SSH_PORT", 22)
     aws_ssh_user: str = _get("AWS_SSH_USER", "")
