@@ -34,6 +34,7 @@ services:
 
       # Optional override via .env; defaults keep compose bootable.
       - ${COLLECTION_FILE:-./backend/collection.json}:${COLLECTION_PATH:-/app/collection.json}:ro
+      - ./archive:/app/archive
     command:
       [
         "uvicorn",
