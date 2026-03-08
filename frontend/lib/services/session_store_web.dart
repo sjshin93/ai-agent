@@ -4,6 +4,7 @@ import 'dart:html' as html;
 class SessionStore {
   static const _key = 'username';
   static const _tokenKey = 'access_token';
+  static const _roleKey = 'user_role';
   static const _logsKey = 'api_test_logs';
   static const _logsFilenameKey = 'api_test_logs_filename';
   static const _logsEnabledKey = 'api_test_logs_enabled';
@@ -26,6 +27,16 @@ class SessionStore {
       return;
     }
     html.window.localStorage[_tokenKey] = value;
+  }
+
+  String? getUserRole() => html.window.localStorage[_roleKey];
+
+  void setUserRole(String? value) {
+    if (value == null || value.isEmpty) {
+      html.window.localStorage.remove(_roleKey);
+      return;
+    }
+    html.window.localStorage[_roleKey] = value;
   }
 
   String? getApiTestLogs() => html.window.localStorage[_logsKey];

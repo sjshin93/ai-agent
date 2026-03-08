@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../../routes.dart';
 import '../../services/auth_service.dart';
+import 'services/admin_service.dart';
 import 'services/config_service.dart';
 import 'services/llm_service.dart';
 import 'services/slack_notification_service.dart';
+import 'api_test_tab.dart';
 import '../../services/session_service.dart';
 import '../../widgets/bs/bs_button.dart';
 import '../../widgets/bs/bs_card.dart';
@@ -37,12 +39,14 @@ class _MainPageState extends State<MainPage> {
   String _footerTimestamp = _formatTimestamp(DateTime.now());
   Duration _idleTimeout = const Duration(minutes: 5);
   int _remainingSeconds = 300;
+  bool _isAdmin = SessionService.getUserRole() == 'admin';
   static const Duration _sessionTouchThrottle = Duration(seconds: 20);
 
   @override
   void initState() {
     super.initState();
     _loadIdleTimeout();
+    unawaited(_refreshAuthProfile());
   }
 
   @override
@@ -139,10 +143,34 @@ class _MainPageState extends State<MainPage> {
     }
     SessionService.setUsername(null);
     SessionService.setAccessToken(null);
+    SessionService.setUserRole(null);
     Navigator.of(context).pushNamedAndRemoveUntil(
       AppRoutes.login,
       (route) => false,
     );
+  }
+
+  Future<void> _refreshAuthProfile() async {
+    try {
+      final me = await _auth.me();
+      if (!me.authenticated) {
+        SessionService.setUserRole(null);
+        if (_isAdmin && mounted) {
+          setState(() => _isAdmin = false);
+        }
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      final role = (me.role ?? 'user').toLowerCase();
+      SessionService.setUserRole(role);
+      if (_isAdmin != (role == 'admin')) {
+        setState(() => _isAdmin = role == 'admin');
+      }
+    } catch (_) {
+      // Keep existing local role on temporary network failures.
+    }
   }
 
   Future<void> _sendInquiry() async {
@@ -216,12 +244,30 @@ class _MainPageState extends State<MainPage> {
     return '$minutes:$seconds';
   }
 
+  List<Tab> _topTabs() {
+    final tabs = <Tab>[
+      const Tab(text: 'LLM'),
+      const Tab(text: 'Archives'),
+    ];
+    if (_isAdmin) {
+      tabs.add(const Tab(text: 'Admin'));
+    }
+    return tabs;
+  }
+
+  String _tabFooterLabel(int index) {
+    if (index == 0) {
+      return 'LLM - Chat';
+    }
+    if (index == 1) {
+      return 'Archives - Archive-picture';
+    }
+    return 'Admin - Users';
+  }
+
   @override
   Widget build(BuildContext context) {
-    const topTabs = [
-      Tab(text: 'LLM'),
-      Tab(text: 'Archives'),
-    ];
+    final topTabs = _topTabs();
 
     return RawKeyboardListener(
       focusNode: _focusNode,
@@ -248,7 +294,7 @@ class _MainPageState extends State<MainPage> {
               bottom: TabBar(
                 tabs: topTabs,
                 onTap: (index) {
-                  _updateFooterLabel(index == 0 ? 'LLM - Chat' : 'Archives - Archive-picture');
+                  _updateFooterLabel(_tabFooterLabel(index));
                 },
               ),
               actions: [
@@ -276,6 +322,10 @@ class _MainPageState extends State<MainPage> {
                 _ArchiveWorkspace(
                   onContextChanged: _updateFooterLabel,
                 ),
+                if (_isAdmin)
+                  _AdminWorkspace(
+                    onContextChanged: _updateFooterLabel,
+                  ),
               ],
             ),
             bottomNavigationBar: StatusFooter(
@@ -589,6 +639,168 @@ class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminWorkspace extends StatefulWidget {
+  const _AdminWorkspace({
+    required this.onContextChanged,
+  });
+
+  final ValueChanged<String> onContextChanged;
+
+  @override
+  State<_AdminWorkspace> createState() => _AdminWorkspaceState();
+}
+
+class _AdminWorkspaceState extends State<_AdminWorkspace> {
+  static const _tabs = [
+    'Users',
+    'API Test',
+  ];
+  int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.onContextChanged('Admin - Users');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _TwoPaneLayout(
+      leftWidth: 220,
+      left: BsCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const BsText('Admin', variant: BsTextVariant.subtitle),
+            const SizedBox(height: 8),
+            for (var i = 0; i < _tabs.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: BsButton(
+                  onPressed: () {
+                    setState(() => _selectedIndex = i);
+                    widget.onContextChanged('Admin - ${_tabs[_selectedIndex]}');
+                  },
+                  label: _tabs[i],
+                  fullWidth: true,
+                  outline: i != _selectedIndex,
+                ),
+              ),
+          ],
+        ),
+      ),
+      right: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_selectedIndex == 0) const _AdminUsersPane(),
+          if (_selectedIndex == 1) const ApiTestTab(),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminUsersPane extends StatefulWidget {
+  const _AdminUsersPane();
+
+  @override
+  State<_AdminUsersPane> createState() => _AdminUsersPaneState();
+}
+
+class _AdminUsersPaneState extends State<_AdminUsersPane> {
+  final _admin = AdminService();
+  bool _isLoading = true;
+  String? _error;
+  List<AdminUser> _users = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final users = await _admin.fetchUsers();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _users = users;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = 'Failed to load users: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const BsText('Users', variant: BsTextVariant.subtitle),
+              BsButton(
+                onPressed: _isLoading ? null : _loadUsers,
+                label: 'Refresh',
+                outline: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            BsText(_error!, variant: BsTextVariant.muted),
+          ],
+          if (!_isLoading && _error == null && _users.isEmpty) ...[
+            const SizedBox(height: 8),
+            const BsText('No users found.', variant: BsTextVariant.muted),
+          ],
+          if (!_isLoading && _error == null && _users.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('ID')),
+                  DataColumn(label: Text('nickname')),
+                  DataColumn(label: Text('role')),
+                ],
+                rows: _users
+                    .map(
+                      (user) => DataRow(
+                        cells: [
+                          DataCell(Text(user.userId)),
+                          DataCell(Text(user.nickname)),
+                          DataCell(Text(user.role)),
+                        ],
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
         ],
       ),
     );

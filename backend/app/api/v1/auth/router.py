@@ -76,7 +76,13 @@ async def me(request: Request):
     if not user_id:
         return MeResponse(authenticated=False)
     nickname = await session_manager.get_user_nickname(user_id)
-    return MeResponse(authenticated=True, user_id=user_id, nickname=nickname)
+    role = await session_manager.get_user_role(user_id)
+    return MeResponse(
+        authenticated=True,
+        user_id=user_id,
+        nickname=nickname,
+        role=role or "user",
+    )
 
 
 @router.post("/logout", response_model=LogoutResponse)

@@ -143,17 +143,6 @@ class Settings:
     aws_ssh_aliases_path: str = _get("AWS_SSH_ALIASES_PATH", "~/.bash_aliases")
     ssh_target_password: str = _get("SSH_TARGET_PASSWORD", "")
 
-    jira_base_url: str = _get("JIRA_BASE_URL", "")
-    jira_email: str = _get("JIRA_EMAIL", "")
-    jira_api_token: str = _get("JIRA_API_TOKEN", "")
-    jira_project_key: str = _get("JIRA_PROJECT_KEY", "TS")
-    jira_issue_type: str = _get("JIRA_ISSUE_TYPE", "Task")
-    jira_customer_part_field_id: str = _get(
-        "JIRA_CUSTOMER_PART_FIELD_ID", "customfield_10046"
-    )
-    jira_req_type_field_id: str = _get(
-        "JIRA_REQ_TYPE_FIELD_ID", "customfield_10047"
-    )
     http_timeout: float = float(_get("HTTP_TIMEOUT", "5"))
     http_retry: int = _get_int("HTTP_RETRY", 3)
 

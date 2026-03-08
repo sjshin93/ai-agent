@@ -424,7 +424,7 @@ class SessionManager:
                 DO UPDATE SET
                   provider = EXCLUDED.provider,
                   provider_user_id = EXCLUDED.provider_user_id,
-                  role = EXCLUDED.role,
+                  role = users.role,
                   nickname = EXCLUDED.nickname,
                   updated_at = EXCLUDED.updated_at,
                   last_login_at = EXCLUDED.last_login_at
@@ -452,6 +452,42 @@ class SessionManager:
             return None
         nickname = str(value).strip()
         return nickname or None
+
+    async def get_user_role(self, user_id: str) -> str | None:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            value = await conn.fetchval(
+                """
+                SELECT role
+                FROM users
+                WHERE user_id = $1
+                """,
+                user_id,
+            )
+        if value is None:
+            return None
+        role = str(value).strip().lower()
+        return role or None
+
+    async def list_users(self) -> list[dict]:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                  user_id,
+                  provider,
+                  provider_user_id,
+                  role,
+                  nickname,
+                  created_at,
+                  updated_at,
+                  last_login_at
+                FROM users
+                ORDER BY created_at DESC
+                """
+            )
+        return [dict(row) for row in rows]
 
     async def record_llm_chat(
         self,

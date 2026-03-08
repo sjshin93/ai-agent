@@ -2,7 +2,7 @@
 
 This repository is a development kit built around a Flutter web frontend and a FastAPI backend.
 It is designed to provide a small internal tool platform with API testing, Slack notifications,
-SSH execution, Jira integration, and LLM utilities.
+SSH execution, and LLM utilities.
 
 ## Architecture
 
@@ -13,7 +13,6 @@ SSH execution, Jira integration, and LLM utilities.
 
 - SNS login with Google and Kakao (OAuth 2.0)
 - API collection test runner
-- Jira issue creation (including attachments)
 - Activity/session logging
 - Slack message sender
 - LLM request testing
@@ -37,7 +36,7 @@ Important groups:
 - Session/Auth: `AUTO_LOGOUT_SECONDS`, `SESSION_*`
 - Storage: `POSTGRES_DSN`, `POSTGRES_POOL_*`, `REDIS_URL`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - Files/Paths: `COLLECTION_FILE`, `COLLECTION_PATH`, `AWS_SSH_KEY_PATH`, `AWS_SSH_ALIASES_PATH`
-- Integrations: `JIRA_*`, `SLACK_WEBHOOK_URL`, `LLM_*`, `OPENWEBUI_*`
+- Integrations: `SLACK_WEBHOOK_URL`, `LLM_*`, `OPENWEBUI_*`
 - Auth: `GOOGLE_*`, `KAKAO_*`
 - Server: `SERVER_HOST`, `SERVER_PORT`
 

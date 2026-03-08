@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  Future<({bool authenticated, String? userId, String? nickname})> me() async {
+  Future<({bool authenticated, String? userId, String? nickname, String? role})> me() async {
     final res = await http.get(Uri.parse('/api/auth/me'));
     if (res.statusCode != 200) {
-      return (authenticated: false, userId: null, nickname: null);
+      return (authenticated: false, userId: null, nickname: null, role: null);
     }
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final authenticated = data['authenticated'] == true;
@@ -14,6 +14,7 @@ class AuthService {
       authenticated: authenticated,
       userId: data['user_id']?.toString(),
       nickname: data['nickname']?.toString(),
+      role: data['role']?.toString(),
     );
   }
 

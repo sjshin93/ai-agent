@@ -15,6 +15,7 @@ app = FastAPI(
         "Internal API for collection test, SSH, LLM, and Slack notification."
     ),
     openapi_tags=[
+        {"name": "admin", "description": "Admin-only user management endpoints."},
         {"name": "config", "description": "Runtime config and session heartbeat."},
         {"name": "auth", "description": "Google/Kakao OAuth sign-in/out."},
         {"name": "collection", "description": "Collection list and execution."},

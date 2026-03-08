@@ -12,6 +12,10 @@ class SessionService {
 
   static void setAccessToken(String? value) => _store.setAccessToken(value);
 
+  static String? getUserRole() => _store.getUserRole();
+
+  static void setUserRole(String? value) => _store.setUserRole(value);
+
   static String? getApiTestLogs() => _store.getApiTestLogs();
 
   static void setApiTestLogs(String? value) => _store.setApiTestLogs(value);

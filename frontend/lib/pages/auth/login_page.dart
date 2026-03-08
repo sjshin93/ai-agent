@@ -37,11 +37,17 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _restoreSessionIfExists() async {
     try {
       final me = await _auth.me();
+      if (!me.authenticated) {
+        SessionService.setUsername(null);
+        SessionService.setAccessToken(null);
+        SessionService.setUserRole(null);
+      }
       if (!mounted || !me.authenticated) {
         return;
       }
       SessionService.setUsername(me.userId ?? 'unknown-user');
       SessionService.setAccessToken(null);
+      SessionService.setUserRole((me.role ?? 'user').toLowerCase());
       Navigator.of(context).pushReplacementNamed(AppRoutes.main);
     } catch (_) {
       // Ignore. User can still login manually.

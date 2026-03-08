@@ -1,6 +1,7 @@
 class SessionStore {
   String? _username;
   String? _accessToken;
+  String? _userRole;
   String? _apiTestLogs;
   String? _apiTestLogsFilename;
   bool _apiTestLogsEnabled = false;
@@ -15,6 +16,12 @@ class SessionStore {
 
   void setAccessToken(String? value) {
     _accessToken = value;
+  }
+
+  String? getUserRole() => _userRole;
+
+  void setUserRole(String? value) {
+    _userRole = value;
   }
 
   String? getApiTestLogs() => _apiTestLogs;
