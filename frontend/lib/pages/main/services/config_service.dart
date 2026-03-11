@@ -60,4 +60,16 @@ class ConfigService {
       return (enabled: false, siteKey: null);
     }
   }
+
+  Future<void> postTurnstileClientLog(Map<String, dynamic> payload) async {
+    try {
+      await http.post(
+        Uri.parse('/api/config/turnstile-client-log'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+    } catch (_) {
+      // Intentionally ignore debug log transport failures.
+    }
+  }
 }
