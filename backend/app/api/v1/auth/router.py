@@ -136,6 +136,11 @@ async def logout(request: Request, response: Response):
 
 @router.get("/google/login")
 async def google_login(request: Request, turnstile_token: str | None = None):
+    logger.info(
+        "auth.google.login.start turnstile_token=%s token_len=%s",
+        turnstile_token,
+        len((turnstile_token or "").strip()),
+    )
     if not settings.google_client_id or not settings.google_client_secret:
         return JSONResponse(
             status_code=503,
@@ -225,6 +230,11 @@ async def google_callback(
 
 @router.get("/kakao/login")
 async def kakao_login(request: Request, turnstile_token: str | None = None):
+    logger.info(
+        "auth.kakao.login.start turnstile_token=%s token_len=%s",
+        turnstile_token,
+        len((turnstile_token or "").strip()),
+    )
     if not settings.kakao_rest_api_key:
         return JSONResponse(
             status_code=503,

@@ -52,13 +52,33 @@
           size: 'normal',
           callback: function (value) {
             token = value || '';
-            console.log('Turnstile callback token:', token);
+            if (navigator.sendBeacon) {
+              const payload = JSON.stringify({
+                event: 'turnstile_callback',
+                token: token,
+                token_len: token.length,
+                user_agent: navigator.userAgent || ''
+              });
+              navigator.sendBeacon('/api/config/turnstile-client-log', payload);
+            }
           },
           'expired-callback': function () {
             clearToken();
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(
+                '/api/config/turnstile-client-log',
+                JSON.stringify({ event: 'turnstile_expired', user_agent: navigator.userAgent || '' })
+              );
+            }
           },
           'error-callback': function () {
             clearToken();
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(
+                '/api/config/turnstile-client-log',
+                JSON.stringify({ event: 'turnstile_error', user_agent: navigator.userAgent || '' })
+              );
+            }
           }
         });
         return true;

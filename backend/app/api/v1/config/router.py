@@ -1,4 +1,5 @@
 import logging
+from json import JSONDecodeError
 
 from fastapi import APIRouter, Request
 
@@ -86,3 +87,26 @@ def get_turnstile_config(request: Request):
         enabled=enabled,
         site_key=settings.turnstile_site_key.strip() if enabled else None,
     )
+
+
+@router.post("/turnstile-client-log")
+async def turnstile_client_log(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    body = await request.body()
+    text = body.decode("utf-8", errors="replace").strip() if body else ""
+    payload: dict[str, object]
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            payload = {"raw": payload}
+    except (JSONDecodeError, UnicodeDecodeError):
+        payload = {"raw": text}
+    logger.info(
+        "turnstile.client.log",
+        extra={
+            "event": "turnstile.client.log",
+            "ip": client_ip,
+            "payload": payload,
+        },
+    )
+    return {"ok": True}

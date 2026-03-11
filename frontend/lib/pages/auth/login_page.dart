@@ -86,7 +86,6 @@ class _LoginPageState extends State<LoginPage> {
       return baseUrl;
     }
     final existingToken = _turnstile.getToken();
-    debugPrint('Turnstile existingToken: $existingToken');
     if (existingToken != null && existingToken.isNotEmpty) {
       return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(existingToken)}';
     }
