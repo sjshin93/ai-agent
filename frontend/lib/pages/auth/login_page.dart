@@ -86,18 +86,35 @@ class _LoginPageState extends State<LoginPage> {
       return baseUrl;
     }
     _turnstile.reset();
-    _turnstile.execute();
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    final token = _turnstile.getToken();
-    if (token == null || token.isEmpty) {
+    final started = _turnstile.execute();
+    if (!started) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Security check is not complete. Please try again.';
+          _errorMessage =
+              'Security check failed to start. Please refresh and try again.';
         });
       }
       return null;
     }
-    return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(token)}';
+
+    const maxWait = Duration(seconds: 6);
+    const poll = Duration(milliseconds: 200);
+    var waited = Duration.zero;
+    while (waited < maxWait) {
+      final token = _turnstile.getToken();
+      if (token != null && token.isNotEmpty) {
+        return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(token)}';
+      }
+      await Future<void>.delayed(poll);
+      waited += poll;
+    }
+
+    if (mounted) {
+      setState(() {
+        _errorMessage = 'Security check timed out. Please try again.';
+      });
+    }
+    return null;
   }
 
   Future<void> _continueWithGoogleLogin() async {
