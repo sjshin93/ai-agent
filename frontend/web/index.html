@@ -85,7 +85,17 @@
           render();
         },
         getToken: function () {
-          return token;
+          if (token) {
+            return token;
+          }
+          if (widgetId !== null && typeof window.turnstile !== 'undefined') {
+            const response = window.turnstile.getResponse(widgetId) || '';
+            if (response) {
+              token = response;
+              return token;
+            }
+          }
+          return '';
         },
         execute: function () {
           if (!siteKey) {
