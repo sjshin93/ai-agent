@@ -85,7 +85,10 @@ class _LoginPageState extends State<LoginPage> {
     if (!_turnstileEnabled) {
       return baseUrl;
     }
-    _turnstile.reset();
+    final existingToken = _turnstile.getToken();
+    if (existingToken != null && existingToken.isNotEmpty) {
+      return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(existingToken)}';
+    }
     final started = _turnstile.execute();
     if (!started) {
       if (mounted) {

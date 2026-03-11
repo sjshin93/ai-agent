@@ -14,6 +14,9 @@
       let siteKey = '';
       let token = '';
       let widgetId = null;
+      const isMobileWebKit =
+        /iPhone|iPad|iPod/i.test(navigator.userAgent || '') &&
+        /AppleWebKit/i.test(navigator.userAgent || '');
 
       function clearToken() {
         token = '';
@@ -35,9 +38,27 @@
           widgetId = null;
         }
         clearToken();
+        const container = document.getElementById('cf-turnstile-container');
+        if (container) {
+          if (isMobileWebKit) {
+            container.style.position = 'fixed';
+            container.style.left = '50%';
+            container.style.bottom = '16px';
+            container.style.top = 'auto';
+            container.style.transform = 'translateX(-50%)';
+            container.style.zIndex = '9999';
+          } else {
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.style.top = '-9999px';
+            container.style.bottom = 'auto';
+            container.style.transform = 'none';
+            container.style.zIndex = '0';
+          }
+        }
         widgetId = window.turnstile.render(selector, {
           sitekey: siteKey,
-          size: 'invisible',
+          size: isMobileWebKit ? 'normal' : 'invisible',
           callback: function (value) {
             token = value || '';
           },
