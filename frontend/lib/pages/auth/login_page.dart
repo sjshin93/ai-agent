@@ -89,40 +89,11 @@ class _LoginPageState extends State<LoginPage> {
     if (existingToken != null && existingToken.isNotEmpty) {
       return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(existingToken)}';
     }
-    if (_turnstile.isManualMode()) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Please complete the security check first.';
-        });
-      }
-      return null;
-    }
-    final started = _turnstile.execute();
-    if (!started) {
-      if (mounted) {
-        setState(() {
-          _errorMessage =
-              'Security check failed to start. Please refresh and try again.';
-        });
-      }
-      return null;
-    }
-
-    const maxWait = Duration(seconds: 6);
-    const poll = Duration(milliseconds: 200);
-    var waited = Duration.zero;
-    while (waited < maxWait) {
-      final token = _turnstile.getToken();
-      if (token != null && token.isNotEmpty) {
-        return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(token)}';
-      }
-      await Future<void>.delayed(poll);
-      waited += poll;
-    }
-
     if (mounted) {
       setState(() {
-        _errorMessage = 'Security check timed out. Please try again.';
+        _errorMessage = _turnstile.isManualMode()
+            ? 'Please complete the security check first.'
+            : 'Security token is missing or expired. Please refresh and try again.';
       });
     }
     return null;
