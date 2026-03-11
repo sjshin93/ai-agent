@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.domains.config.schemas import (
     AutoLogoutConfigResponse,
     SessionTouchResponse,
+    TurnstileConfigResponse,
     VersionConfigResponse,
 )
 
@@ -61,3 +62,27 @@ def touch_session(request: Request):
         },
     )
     return SessionTouchResponse(ok=True)
+
+
+@router.get("/turnstile", response_model=TurnstileConfigResponse)
+def get_turnstile_config(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    user = getattr(request.state, "username", "anonymous")
+    enabled = (
+        settings.turnstile_enabled
+        and bool(settings.turnstile_site_key.strip())
+        and bool(settings.turnstile_secret_key.strip())
+    )
+    logger.info(
+        "config.turnstile.read",
+        extra={
+            "event": "config.turnstile.read",
+            "user": user,
+            "ip": client_ip,
+            "enabled": enabled,
+        },
+    )
+    return TurnstileConfigResponse(
+        enabled=enabled,
+        site_key=settings.turnstile_site_key.strip() if enabled else None,
+    )

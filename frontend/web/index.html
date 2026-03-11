@@ -8,6 +8,85 @@
   <title>Flutter + FastAPI</title>
 </head>
 <body>
+  <div id="cf-turnstile-container" style="position:absolute;left:-9999px;top:-9999px;"></div>
+  <script>
+    (function () {
+      let siteKey = '';
+      let token = '';
+      let widgetId = null;
+
+      function clearToken() {
+        token = '';
+      }
+
+      function canRender() {
+        return !!siteKey && typeof window.turnstile !== 'undefined';
+      }
+
+      function render() {
+        if (!canRender()) {
+          return false;
+        }
+        const selector = '#cf-turnstile-container';
+        if (widgetId !== null) {
+          try {
+            window.turnstile.remove(widgetId);
+          } catch (e) {}
+          widgetId = null;
+        }
+        clearToken();
+        widgetId = window.turnstile.render(selector, {
+          sitekey: siteKey,
+          size: 'invisible',
+          callback: function (value) {
+            token = value || '';
+          },
+          'expired-callback': function () {
+            clearToken();
+          },
+          'error-callback': function () {
+            clearToken();
+          }
+        });
+        return true;
+      }
+
+      window.__cfTurnstileBridge = {
+        setSiteKey: function (value) {
+          siteKey = (value || '').trim();
+          clearToken();
+          if (!siteKey) {
+            return;
+          }
+          render();
+        },
+        getToken: function () {
+          return token;
+        },
+        execute: function () {
+          if (!siteKey) {
+            return false;
+          }
+          if (widgetId === null && !render()) {
+            return false;
+          }
+          if (typeof window.turnstile === 'undefined') {
+            return false;
+          }
+          window.turnstile.execute(widgetId);
+          return true;
+        },
+        reset: function () {
+          clearToken();
+          if (widgetId === null || typeof window.turnstile === 'undefined') {
+            return;
+          }
+          window.turnstile.reset(widgetId);
+        }
+      };
+    })();
+  </script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

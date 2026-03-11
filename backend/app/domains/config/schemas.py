@@ -11,3 +11,8 @@ class VersionConfigResponse(BaseModel):
 
 class SessionTouchResponse(BaseModel):
     ok: bool
+
+
+class TurnstileConfigResponse(BaseModel):
+    enabled: bool
+    site_key: str | None = None

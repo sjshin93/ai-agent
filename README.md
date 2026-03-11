@@ -67,6 +67,28 @@ docker compose up --build
    - `KAKAO_CLIENT_SECRET` (if enabled in Kakao security settings)
    - `KAKAO_REDIRECT_URI` (same as above unless changed)
 
+### Cloudflare Setup
+
+#### 1) Bot Fight Mode
+
+Enable in Cloudflare dashboard:
+
+1. Select your zone.
+2. Go to `Security` -> `Bots`.
+3. Turn on `Bot Fight Mode`.
+
+#### 2) Turnstile
+
+1. Create a Turnstile widget in Cloudflare (`Turnstile` -> `Add widget`).
+2. Add your domain (for local test, include `localhost`).
+3. Set `.env`:
+   - `TURNSTILE_ENABLED=true`
+   - `TURNSTILE_SITE_KEY=<your site key>`
+   - `TURNSTILE_SECRET_KEY=<your secret key>`
+4. Restart services.
+
+When enabled, the login flow (`/api/auth/google/login`, `/api/auth/kakao/login`) validates a Turnstile token before OAuth redirect.
+
 ### Flutter Build Notes
 
 If the Flutter project is missing generated scaffolding and Docker build fails, run:

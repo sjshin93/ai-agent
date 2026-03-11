@@ -44,4 +44,20 @@ class ConfigService {
       return false;
     }
   }
+
+  Future<({bool enabled, String? siteKey})> getTurnstileConfig() async {
+    try {
+      final res = await http.get(Uri.parse('/api/config/turnstile'));
+      if (res.statusCode != 200) {
+        return (enabled: false, siteKey: null);
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return (
+        enabled: data['enabled'] == true,
+        siteKey: data['site_key']?.toString(),
+      );
+    } catch (_) {
+      return (enabled: false, siteKey: null);
+    }
+  }
 }

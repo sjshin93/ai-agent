@@ -4,6 +4,8 @@ import '../../routes.dart';
 import '../../services/auth_service.dart';
 import '../../services/browser_redirect.dart';
 import '../../services/session_service.dart';
+import '../../services/turnstile_service.dart';
+import '../main/services/config_service.dart';
 import '../../widgets/bs/bs_button.dart';
 import '../../widgets/bs/bs_card.dart';
 import '../../widgets/bs/bs_text.dart';
@@ -17,7 +19,10 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _auth = AuthService();
+  final _config = ConfigService();
+  final _turnstile = TurnstileService();
   String? _errorMessage;
+  bool _turnstileEnabled = false;
   static const _googleRed = Color(0xFFDB4437);
   static const _googleRedBorder = Color(0xFFF2C9C5);
 
@@ -27,11 +32,33 @@ class _LoginPageState extends State<LoginPage> {
     final googleStatus = Uri.base.queryParameters['google'];
     final kakaoStatus = Uri.base.queryParameters['kakao'];
     if (googleStatus == 'error') {
-      _errorMessage = 'Google login failed. Please verify OAuth settings.';
+      _errorMessage = 'Google login failed. Please verify OAuth and Turnstile settings.';
     } else if (kakaoStatus == 'error') {
-      _errorMessage = 'Kakao login failed. Please verify OAuth settings.';
+      _errorMessage = 'Kakao login failed. Please verify OAuth and Turnstile settings.';
     }
+    _loadTurnstileConfig();
     _restoreSessionIfExists();
+  }
+
+  Future<void> _loadTurnstileConfig() async {
+    final cfg = await _config.getTurnstileConfig();
+    final siteKey = cfg.siteKey?.trim() ?? '';
+    if (!cfg.enabled || siteKey.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _turnstileEnabled = false;
+      });
+      return;
+    }
+    await _turnstile.configure(siteKey);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _turnstileEnabled = true;
+    });
   }
 
   Future<void> _restoreSessionIfExists() async {
@@ -54,12 +81,39 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _continueWithGoogleLogin() {
-    redirectTo('/api/auth/google/login');
+  Future<String?> _buildLoginUrl(String baseUrl) async {
+    if (!_turnstileEnabled) {
+      return baseUrl;
+    }
+    _turnstile.reset();
+    _turnstile.execute();
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    final token = _turnstile.getToken();
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Security check is not complete. Please try again.';
+        });
+      }
+      return null;
+    }
+    return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(token)}';
   }
 
-  void _continueWithKakaoLogin() {
-    redirectTo('/api/auth/kakao/login');
+  Future<void> _continueWithGoogleLogin() async {
+    final url = await _buildLoginUrl('/api/auth/google/login');
+    if (url == null) {
+      return;
+    }
+    redirectTo(url);
+  }
+
+  Future<void> _continueWithKakaoLogin() async {
+    final url = await _buildLoginUrl('/api/auth/kakao/login');
+    if (url == null) {
+      return;
+    }
+    redirectTo(url);
   }
 
   @override
@@ -86,6 +140,14 @@ class _LoginPageState extends State<LoginPage> {
                     variant: BsTextVariant.muted,
                     textAlign: TextAlign.center,
                   ),
+                  if (_turnstileEnabled) ...[
+                    const SizedBox(height: 8),
+                    const BsText(
+                      'Cloudflare Turnstile is enabled.',
+                      variant: BsTextVariant.muted,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,

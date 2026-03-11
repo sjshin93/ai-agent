@@ -129,6 +129,9 @@ class Settings:
     )
     kakao_success_redirect: str = _get("KAKAO_SUCCESS_REDIRECT", "/login?kakao=ok")
     kakao_failure_redirect: str = _get("KAKAO_FAILURE_REDIRECT", "/login?kakao=error")
+    turnstile_enabled: bool = _get_bool("TURNSTILE_ENABLED", False)
+    turnstile_site_key: str = _get("TURNSTILE_SITE_KEY", "")
+    turnstile_secret_key: str = _get("TURNSTILE_SECRET_KEY", "")
     admin_user_ids: list[str] = _get_csv(
         "ADMIN_USER_IDS",
         "kakao_4784641296,google_112479972436700768040",
