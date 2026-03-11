@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../routes.dart';
@@ -23,6 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   final _turnstile = TurnstileService();
   String? _errorMessage;
   bool _turnstileEnabled = false;
+  bool _isLoginInProgress = false;
   static const _googleRed = Color(0xFFDB4437);
   static const _googleRedBorder = Color(0xFFF2C9C5);
 
@@ -83,37 +86,37 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<String?> _buildLoginUrl(String baseUrl) async {
     if (!_turnstileEnabled) {
-      _config.postTurnstileClientLog({
+      unawaited(_config.postTurnstileClientLog({
         'event': 'login_url_build',
         'base_url': baseUrl,
         'turnstile_enabled': false,
         'result': 'bypass',
-      });
+      }));
       return baseUrl;
     }
     final existingToken = _turnstile.getToken();
-    await _config.postTurnstileClientLog({
+    unawaited(_config.postTurnstileClientLog({
       'event': 'login_token_read',
       'base_url': baseUrl,
       'token': existingToken,
       'token_len': existingToken?.length ?? 0,
       'token_present': existingToken != null && existingToken.isNotEmpty,
-    });
+    }));
     if (existingToken != null && existingToken.isNotEmpty) {
-      await _config.postTurnstileClientLog({
+      unawaited(_config.postTurnstileClientLog({
         'event': 'login_url_build',
         'base_url': baseUrl,
         'result': 'ok',
-      });
+      }));
       return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(existingToken)}';
     }
-    await _config.postTurnstileClientLog({
+    unawaited(_config.postTurnstileClientLog({
       'event': 'login_url_build',
       'base_url': baseUrl,
       'result': 'null',
       'reason': 'missing_token',
       'manual_mode': _turnstile.isManualMode(),
-    });
+    }));
     if (mounted) {
       setState(() {
         _errorMessage = _turnstile.isManualMode()
@@ -125,32 +128,54 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _continueWithGoogleLogin() async {
-    await _config.postTurnstileClientLog({
-      'event': 'google_button_click',
+    if (_isLoginInProgress) {
+      return;
+    }
+    setState(() {
+      _isLoginInProgress = true;
     });
+    unawaited(_config.postTurnstileClientLog({
+      'event': 'google_button_click',
+    }));
     final url = await _buildLoginUrl('/api/auth/google/login');
-    await _config.postTurnstileClientLog({
+    unawaited(_config.postTurnstileClientLog({
       'event': 'google_login_flow',
       'url_is_null': url == null,
       'url': url,
-    });
+    }));
     if (url == null) {
+      if (mounted) {
+        setState(() {
+          _isLoginInProgress = false;
+        });
+      }
       return;
     }
     redirectTo(url);
   }
 
   Future<void> _continueWithKakaoLogin() async {
-    await _config.postTurnstileClientLog({
-      'event': 'kakao_button_click',
+    if (_isLoginInProgress) {
+      return;
+    }
+    setState(() {
+      _isLoginInProgress = true;
     });
+    unawaited(_config.postTurnstileClientLog({
+      'event': 'kakao_button_click',
+    }));
     final url = await _buildLoginUrl('/api/auth/kakao/login');
-    await _config.postTurnstileClientLog({
+    unawaited(_config.postTurnstileClientLog({
       'event': 'kakao_login_flow',
       'url_is_null': url == null,
       'url': url,
-    });
+    }));
     if (url == null) {
+      if (mounted) {
+        setState(() {
+          _isLoginInProgress = false;
+        });
+      }
       return;
     }
     redirectTo(url);
@@ -192,7 +217,7 @@ class _LoginPageState extends State<LoginPage> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: _continueWithGoogleLogin,
+                      onPressed: _isLoginInProgress ? null : _continueWithGoogleLogin,
                       icon: const Text(
                         'G',
                         style: TextStyle(
@@ -221,7 +246,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 8),
                   BsButton(
-                    onPressed: _continueWithKakaoLogin,
+                    onPressed: _isLoginInProgress ? null : _continueWithKakaoLogin,
                     label: 'Continue with Kakao',
                     fullWidth: true,
                   ),
