@@ -46,4 +46,13 @@ class TurnstileService {
     }
     js_util.callMethod<void>(bridge, 'reset', const []);
   }
+
+  bool isManualMode() {
+    final bridge = _bridge();
+    if (bridge == null) {
+      return false;
+    }
+    final result = js_util.callMethod<Object?>(bridge, 'isManualMode', const []);
+    return result == true;
+  }
 }

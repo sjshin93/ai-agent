@@ -73,6 +73,9 @@
       }
 
       window.__cfTurnstileBridge = {
+        isManualMode: function () {
+          return isMobileWebKit;
+        },
         setSiteKey: function (value) {
           siteKey = (value || '').trim();
           clearToken();

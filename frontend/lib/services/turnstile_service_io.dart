@@ -6,4 +6,6 @@ class TurnstileService {
   bool execute() => false;
 
   void reset() {}
+
+  bool isManualMode() => false;
 }

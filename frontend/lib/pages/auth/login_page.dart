@@ -89,6 +89,14 @@ class _LoginPageState extends State<LoginPage> {
     if (existingToken != null && existingToken.isNotEmpty) {
       return '$baseUrl?turnstile_token=${Uri.encodeQueryComponent(existingToken)}';
     }
+    if (_turnstile.isManualMode()) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Please complete the security check first.';
+        });
+      }
+      return null;
+    }
     final started = _turnstile.execute();
     if (!started) {
       if (mounted) {
