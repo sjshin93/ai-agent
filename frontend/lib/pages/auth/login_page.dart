@@ -26,6 +26,7 @@ class _LoginPageState extends State<LoginPage> {
   String? _errorMessage;
   bool _turnstileEnabled = false;
   bool _isLoginInProgress = false;
+  String _debugStatus = 'idle';
   static const _googleRed = Color(0xFFDB4437);
   static const _googleRedBorder = Color(0xFFF2C9C5);
 
@@ -129,10 +130,16 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _continueWithGoogleLogin() async {
     if (_isLoginInProgress) {
+      if (mounted) {
+        setState(() {
+          _debugStatus = 'google_click_ignored_in_progress';
+        });
+      }
       return;
     }
     setState(() {
       _isLoginInProgress = true;
+      _debugStatus = 'google_click_detected';
     });
     unawaited(_config.postTurnstileClientLog({
       'event': 'google_button_click',
@@ -147,19 +154,31 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         setState(() {
           _isLoginInProgress = false;
+          _debugStatus = 'google_url_null';
         });
       }
       return;
+    }
+    if (mounted) {
+      setState(() {
+        _debugStatus = 'google_redirect';
+      });
     }
     redirectTo(url);
   }
 
   Future<void> _continueWithKakaoLogin() async {
     if (_isLoginInProgress) {
+      if (mounted) {
+        setState(() {
+          _debugStatus = 'kakao_click_ignored_in_progress';
+        });
+      }
       return;
     }
     setState(() {
       _isLoginInProgress = true;
+      _debugStatus = 'kakao_click_detected';
     });
     unawaited(_config.postTurnstileClientLog({
       'event': 'kakao_button_click',
@@ -174,9 +193,15 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         setState(() {
           _isLoginInProgress = false;
+          _debugStatus = 'kakao_url_null';
         });
       }
       return;
+    }
+    if (mounted) {
+      setState(() {
+        _debugStatus = 'kakao_redirect';
+      });
     }
     redirectTo(url);
   }
@@ -194,6 +219,12 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  BsText(
+                    'DEBUG: $_debugStatus',
+                    variant: BsTextVariant.muted,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
                   const BsText(
                     'Enter',
                     variant: BsTextVariant.title,
@@ -216,39 +247,75 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoginInProgress ? null : _continueWithGoogleLogin,
-                      icon: const Text(
-                        'G',
-                        style: TextStyle(
-                          color: _googleRed,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _isLoginInProgress
+                          ? null
+                          : () {
+                              setState(() {
+                                _debugStatus = 'google_gesture_tap';
+                              });
+                              _continueWithGoogleLogin();
+                            },
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoginInProgress
+                            ? null
+                            : () {
+                                setState(() {
+                                  _debugStatus = 'google_button_pressed';
+                                });
+                                _continueWithGoogleLogin();
+                              },
+                        icon: const Text(
+                          'G',
+                          style: TextStyle(
+                            color: _googleRed,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      label: const Text(
-                        'Continue with Google',
-                        style: TextStyle(
-                          color: _googleRed,
-                          fontWeight: FontWeight.w600,
+                        label: const Text(
+                          'Continue with Google',
+                          style: TextStyle(
+                            color: _googleRed,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _googleRed,
-                        side: const BorderSide(color: _googleRedBorder),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: _googleRed,
+                          side: const BorderSide(color: _googleRedBorder),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  BsButton(
-                    onPressed: _isLoginInProgress ? null : _continueWithKakaoLogin,
-                    label: 'Continue with Kakao',
-                    fullWidth: true,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _isLoginInProgress
+                        ? null
+                        : () {
+                            setState(() {
+                              _debugStatus = 'kakao_gesture_tap';
+                            });
+                            _continueWithKakaoLogin();
+                          },
+                    child: BsButton(
+                      onPressed: _isLoginInProgress
+                          ? null
+                          : () {
+                              setState(() {
+                                _debugStatus = 'kakao_button_pressed';
+                              });
+                              _continueWithKakaoLogin();
+                            },
+                      label: 'Continue with Kakao',
+                      fullWidth: true,
+                    ),
                   ),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 12),
