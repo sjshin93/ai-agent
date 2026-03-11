@@ -52,6 +52,7 @@
           size: 'normal',
           callback: function (value) {
             token = value || '';
+            console.log('Turnstile callback token:', token);
           },
           'expired-callback': function () {
             clearToken();
