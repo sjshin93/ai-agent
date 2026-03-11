@@ -40,25 +40,16 @@
         clearToken();
         const container = document.getElementById('cf-turnstile-container');
         if (container) {
-          if (isMobileWebKit) {
-            container.style.position = 'fixed';
-            container.style.left = '50%';
-            container.style.bottom = '16px';
-            container.style.top = 'auto';
-            container.style.transform = 'translateX(-50%)';
-            container.style.zIndex = '9999';
-          } else {
-            container.style.position = 'absolute';
-            container.style.left = '-9999px';
-            container.style.top = '-9999px';
-            container.style.bottom = 'auto';
-            container.style.transform = 'none';
-            container.style.zIndex = '0';
-          }
+          container.style.position = 'fixed';
+          container.style.left = '50%';
+          container.style.bottom = '16px';
+          container.style.top = 'auto';
+          container.style.transform = 'translateX(-50%)';
+          container.style.zIndex = '9999';
         }
         widgetId = window.turnstile.render(selector, {
           sitekey: siteKey,
-          size: isMobileWebKit ? 'normal' : 'invisible',
+          size: 'normal',
           callback: function (value) {
             token = value || '';
           },

@@ -17,7 +17,6 @@ class TurnstileService {
       return;
     }
     js_util.callMethod<void>(bridge, 'setSiteKey', [siteKey]);
-    js_util.callMethod<void>(bridge, 'execute', const []);
   }
 
   String? getToken() {
