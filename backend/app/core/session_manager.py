@@ -141,6 +141,49 @@ class SessionManager:
                     )
                     await conn.execute(
                         """
+                        CREATE TABLE IF NOT EXISTS voice_archives (
+                          id UUID PRIMARY KEY,
+                          person_id TEXT NOT NULL,
+                          file_name TEXT NOT NULL,
+                          file_ext TEXT NOT NULL,
+                          storage_key TEXT NOT NULL,
+                          created_at TIMESTAMP NOT NULL
+                            DEFAULT timezone('Asia/Seoul', now()),
+                          sha256 TEXT NOT NULL,
+                          captured_at TIMESTAMP NULL,
+                          tags TEXT NOT NULL DEFAULT '',
+                          emotion TEXT NULL,
+                          reference_text TEXT NULL,
+                          stt_text TEXT NULL
+                        )
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS voice_archives_storage_key_uniq
+                        ON voice_archives(storage_key)
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS voice_archives_sha256_uniq
+                        ON voice_archives(sha256)
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS voice_archives_person_created_idx
+                        ON voice_archives(person_id, created_at DESC)
+                        """
+                    )
+                    await conn.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS voice_archives_person_captured_idx
+                        ON voice_archives(person_id, captured_at DESC)
+                        """
+                    )
+                    await conn.execute(
+                        """
                         CREATE UNIQUE INDEX IF NOT EXISTS users_provider_provider_user_id_uniq
                         ON users(provider, provider_user_id)
                         """
