@@ -7,9 +7,14 @@ import 'audio_recorder_service.dart';
 AudioRecorderService createAudioRecorderService() => _WebAudioRecorderService();
 
 class _WebAudioRecorderService implements AudioRecorderService {
+  static const html.EventStreamProvider<html.Event> _dataAvailableEvent =
+      html.EventStreamProvider<html.Event>('dataavailable');
+  static const html.EventStreamProvider<html.Event> _stopEvent =
+      html.EventStreamProvider<html.Event>('stop');
+
   html.MediaRecorder? _recorder;
   html.MediaStream? _stream;
-  StreamSubscription<html.BlobEvent>? _dataSub;
+  StreamSubscription<html.Event>? _dataSub;
   StreamSubscription<html.Event>? _stopSub;
   final List<html.Blob> _chunks = [];
   Completer<RecordedAudio>? _stopCompleter;
@@ -36,14 +41,15 @@ class _WebAudioRecorderService implements AudioRecorderService {
       _stream!,
       {'mimeType': _mimeType},
     );
-    _dataSub = _recorder!.onDataAvailable.listen((event) {
-      final data = event.data;
+    _dataSub = _dataAvailableEvent.forTarget(_recorder!).listen((event) {
+      final dynamic blobEvent = event;
+      final data = blobEvent.data as html.Blob?;
       if (data != null && data.size > 0) {
         _chunks.add(data);
       }
     });
     _stopCompleter = Completer<RecordedAudio>();
-    _stopSub = _recorder!.onStop.listen((_) async {
+    _stopSub = _stopEvent.forTarget(_recorder!).listen((_) async {
       final audio = await _buildAudio();
       _stopCompleter?.complete(audio);
       _cleanupTracks();
