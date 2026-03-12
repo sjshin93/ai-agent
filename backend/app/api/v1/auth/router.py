@@ -1,5 +1,6 @@
 import logging
 import secrets
+import ipaddress
 from urllib.parse import urlencode
 
 import httpx
@@ -47,6 +48,36 @@ def _redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url=url, status_code=302)
 
 
+def _extract_turnstile_remote_ip(request: Request) -> tuple[str | None, str]:
+    # Prefer forwarded headers from reverse proxy, then fallback to direct client.
+    candidates: list[tuple[str, str]] = []
+
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        for raw in xff.split(","):
+            ip = raw.strip()
+            if ip:
+                candidates.append(("x-forwarded-for", ip))
+
+    x_real_ip = request.headers.get("x-real-ip", "").strip()
+    if x_real_ip:
+        candidates.append(("x-real-ip", x_real_ip))
+
+    direct_ip = request.client.host if request.client and request.client.host else ""
+    if direct_ip:
+        candidates.append(("request.client.host", direct_ip))
+
+    for source, raw_ip in candidates:
+        try:
+            ip_obj = ipaddress.ip_address(raw_ip)
+        except ValueError:
+            continue
+        if ip_obj.is_global:
+            return raw_ip, source
+
+    return None, "none"
+
+
 def _oauth_state_response(
     *,
     state_cookie_name: str,
@@ -77,15 +108,23 @@ async def _verify_turnstile(request: Request, token: str | None) -> bool:
         return False
     response_token = (token or "").strip()
     if not response_token:
+        logger.info("Turnstile verification skipped: missing response token.")
         return False
 
     payload: dict[str, str] = {
         "secret": secret,
         "response": response_token,
     }
-    client_ip = request.client.host if request.client and request.client.host else ""
-    if client_ip:
-        payload["remoteip"] = client_ip
+    remoteip, remoteip_source = _extract_turnstile_remote_ip(request)
+    if remoteip:
+        payload["remoteip"] = remoteip
+
+    logger.info(
+        "Turnstile verification start. token_len=%s remoteip=%s remoteip_source=%s",
+        len(response_token),
+        remoteip or "",
+        remoteip_source,
+    )
 
     timeout = max(1.0, settings.http_timeout)
     try:
@@ -94,15 +133,32 @@ async def _verify_turnstile(request: Request, token: str | None) -> bool:
             verify_res.raise_for_status()
             verify_data = verify_res.json()
     except Exception as exc:
-        logger.warning("Turnstile verification request failed: %s", exc)
+        logger.warning(
+            "Turnstile verification request failed: %s (remoteip=%s source=%s)",
+            exc,
+            remoteip or "",
+            remoteip_source,
+        )
         return False
 
     success = bool(verify_data.get("success"))
     if not success:
         logger.info(
-            "Turnstile verification rejected. errors=%s hostname=%s",
+            "Turnstile verification rejected. errors=%s hostname=%s action=%s cdata=%s remoteip=%s source=%s",
             verify_data.get("error-codes"),
             verify_data.get("hostname"),
+            verify_data.get("action"),
+            verify_data.get("cdata"),
+            remoteip or "",
+            remoteip_source,
+        )
+    else:
+        logger.info(
+            "Turnstile verification passed. hostname=%s action=%s remoteip=%s source=%s",
+            verify_data.get("hostname"),
+            verify_data.get("action"),
+            remoteip or "",
+            remoteip_source,
         )
     return success
 
@@ -137,8 +193,8 @@ async def logout(request: Request, response: Response):
 @router.get("/google/login")
 async def google_login(request: Request, turnstile_token: str | None = None):
     logger.info(
-        "auth.google.login.start turnstile_token=%s token_len=%s",
-        turnstile_token,
+        "auth.google.login.start token_present=%s token_len=%s",
+        bool((turnstile_token or "").strip()),
         len((turnstile_token or "").strip()),
     )
     if not settings.google_client_id or not settings.google_client_secret:
@@ -231,8 +287,8 @@ async def google_callback(
 @router.get("/kakao/login")
 async def kakao_login(request: Request, turnstile_token: str | None = None):
     logger.info(
-        "auth.kakao.login.start turnstile_token=%s token_len=%s",
-        turnstile_token,
+        "auth.kakao.login.start token_present=%s token_len=%s",
+        bool((turnstile_token or "").strip()),
         len((turnstile_token or "").strip()),
     )
     if not settings.kakao_rest_api_key:

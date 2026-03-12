@@ -7,3 +7,4 @@ vault/agent/token
 vault/data/
 pidfile
 info_danji.txt
+backend/app/api/v1/auth/__pycache__
