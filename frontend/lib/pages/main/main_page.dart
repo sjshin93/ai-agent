@@ -10,6 +10,7 @@ import 'services/config_service.dart';
 import 'services/diary_service.dart';
 import 'services/llm_service.dart';
 import 'services/slack_notification_service.dart';
+import 'services/voice_prompt_service.dart';
 import 'api_test_tab.dart';
 import '../../services/session_service.dart';
 import '../../ui/bootstrap_colors.dart';
@@ -600,10 +601,14 @@ class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
 
   @override
   Widget build(BuildContext context) {
-    final isDiaryTab = _archives[_selectedIndex] == 'Archive-Diary';
+    final selected = _archives[_selectedIndex];
+    final isDiaryTab = selected == 'Archive-Diary';
+    final voiceCategory = _voiceCategoryFromLabel(selected);
     final helpMessage = isDiaryTab
         ? 'Diary entries follow the template provided on the left and are stored as raw text under /archive/{person_id}/memory/raw/.'
-        : 'Browse archive categories from the left sub tabs.';
+        : voiceCategory != null
+            ? 'Load prompt direction and script from CSV, then record and review each item.'
+            : 'Browse archive categories from the left sub tabs.';
     return _TwoPaneLayout(
       leftWidth: 230,
       left: BsCard(
@@ -637,6 +642,11 @@ class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
           const SizedBox(height: 16),
           if (isDiaryTab)
             _ArchiveDiaryPane(onContextChanged: widget.onContextChanged)
+          else if (voiceCategory != null)
+            _ArchiveVoicePane(
+              category: voiceCategory,
+              title: selected,
+            )
           else
             BsCard(
               child: Column(
@@ -650,6 +660,269 @@ class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  String? _voiceCategoryFromLabel(String label) {
+    switch (label) {
+      case 'Archive-Timbre':
+        return 'timbre';
+      case 'Archive-Prosody':
+        return 'prosody';
+      case 'Archive-emotion':
+        return 'emotion';
+      default:
+        return null;
+    }
+  }
+}
+
+class _ArchiveVoicePane extends StatefulWidget {
+  const _ArchiveVoicePane({
+    required this.category,
+    required this.title,
+  });
+
+  final String category;
+  final String title;
+
+  @override
+  State<_ArchiveVoicePane> createState() => _ArchiveVoicePaneState();
+}
+
+class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
+  final _service = const VoicePromptService();
+  bool _isLoading = true;
+  String? _error;
+  List<VoicePromptItem> _items = [];
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ArchiveVoicePane oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.category != widget.category) {
+      _index = 0;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final response = await _service.fetchByCategory(widget.category);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _items = response.items;
+        _isLoading = false;
+        _index = 0;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  void _move(int delta) {
+    if (_items.isEmpty) {
+      return;
+    }
+    final next = (_index + delta).clamp(0, _items.length - 1);
+    if (next == _index) {
+      return;
+    }
+    setState(() => _index = next);
+  }
+
+  void _showActionPlaceholder(String action) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$action 기능은 다음 단계에서 연결됩니다.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const BsCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LinearProgressIndicator(minHeight: 2),
+            SizedBox(height: 12),
+            BsText('Loading prompts...', variant: BsTextVariant.muted),
+          ],
+        ),
+      );
+    }
+    if (_error != null) {
+      return BsCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            BsAlert(
+              message: _error!,
+              variant: BsVariant.danger,
+            ),
+            const SizedBox(height: 12),
+            BsButton(
+              onPressed: _load,
+              label: 'Retry',
+              outline: true,
+            ),
+          ],
+        ),
+      );
+    }
+    if (_items.isEmpty) {
+      return const BsCard(
+        child: BsText('No prompts found in CSV.', variant: BsTextVariant.muted),
+      );
+    }
+
+    final item = _items[_index];
+    final hasEmotionMeta = (item.emotionLevel?.isNotEmpty ?? false) ||
+        (item.emotionIntensity?.isNotEmpty ?? false);
+    final progressLabel = '${_index + 1} / ${_items.length}';
+
+    return BsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              BsText(widget.title, variant: BsTextVariant.subtitle),
+              BsText(progressLabel, variant: BsTextVariant.caption),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.45),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withOpacity(0.35),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const BsText('녹음 가이드', variant: BsTextVariant.caption),
+                const SizedBox(height: 6),
+                Text(item.direction),
+              ],
+            ),
+          ),
+          if (hasEmotionMeta) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (item.emotionLevel != null)
+                  _MetaChip(label: '감정', value: item.emotionLevel!),
+                if (item.emotionIntensity != null)
+                  _MetaChip(label: '단계', value: item.emotionIntensity!),
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: SelectableText(
+              item.text,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: BsButton(
+                  onPressed: () => _showActionPlaceholder('녹음'),
+                  label: '녹음',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: BsButton(
+                  onPressed: () => _showActionPlaceholder('듣기'),
+                  label: '듣기',
+                  outline: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: BsButton(
+                  onPressed: _index > 0 ? () => _move(-1) : null,
+                  label: '이전',
+                  outline: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: BsButton(
+                  onPressed: _index < _items.length - 1 ? () => _move(1) : null,
+                  label: '다음',
+                  outline: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.25),
+        ),
+      ),
+      child: Text(
+        '$label: $value',
+        style: Theme.of(context).textTheme.bodySmall,
       ),
     );
   }

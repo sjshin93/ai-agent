@@ -1,0 +1,1 @@
+"""Voice prompt archive domain."""

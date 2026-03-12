@@ -5,9 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.core.config import settings
 from app.core.session_manager import SessionManager
-from app.dependencies import get_diary_service, get_session_manager
+from app.dependencies import (
+    get_diary_service,
+    get_session_manager,
+    get_voice_prompt_service,
+)
 from app.domains.diary.schemas import DiaryArchiveRequest, DiaryArchiveResponse
 from app.domains.diary.service import DiaryDuplicateError, DiaryService
+from app.domains.voice_prompts.schemas import (
+    VoicePromptCategory,
+    VoicePromptListResponse,
+)
+from app.domains.voice_prompts.service import VoicePromptLoadError, VoicePromptService
 
 router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
@@ -64,3 +73,22 @@ async def archive_diary(
     except Exception as exc:  # pragma: no cover - best-effort logging
         logger.warning("Failed to record diary activity: %s", exc)
     return response
+
+
+@router.get("/voice-prompts/{category}", response_model=VoicePromptListResponse)
+async def list_voice_prompts(
+    category: VoicePromptCategory,
+    request: Request,
+    service: VoicePromptService = Depends(get_voice_prompt_service),
+    sessions: SessionManager = Depends(get_session_manager),
+) -> VoicePromptListResponse:
+    await _require_authenticated_session(request, sessions)
+    try:
+        items = service.load(category)
+    except VoicePromptLoadError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return VoicePromptListResponse(
+        category=category,
+        count=len(items),
+        items=items,
+    )
