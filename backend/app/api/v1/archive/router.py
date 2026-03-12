@@ -1,17 +1,24 @@
 import logging
+from datetime import datetime
 from time import perf_counter
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from app.core.config import settings
 from app.core.session_manager import SessionManager
 from app.dependencies import (
+    get_voice_archive_service,
     get_diary_service,
     get_session_manager,
     get_voice_prompt_service,
 )
 from app.domains.diary.schemas import DiaryArchiveRequest, DiaryArchiveResponse
 from app.domains.diary.service import DiaryDuplicateError, DiaryService
+from app.domains.voice_archive.schemas import VoiceArchiveResponse
+from app.domains.voice_archive.service import (
+    VoiceArchiveDuplicateError,
+    VoiceArchiveService,
+)
 from app.domains.voice_prompts.schemas import (
     VoicePromptCategory,
     VoicePromptListResponse,
@@ -92,3 +99,56 @@ async def list_voice_prompts(
         count=len(items),
         items=items,
     )
+
+
+@router.post("/voice", response_model=VoiceArchiveResponse)
+async def archive_voice(
+    request: Request,
+    audio: UploadFile = File(...),
+    tags: str = Form(""),
+    emotion: str | None = Form(None),
+    reference_text: str | None = Form(None),
+    stt_text: str | None = Form(None),
+    captured_at: str | None = Form(None),
+    file_ext: str | None = Form(None),
+    service: VoiceArchiveService = Depends(get_voice_archive_service),
+    sessions: SessionManager = Depends(get_session_manager),
+) -> VoiceArchiveResponse:
+    user_id, _ = await _require_authenticated_session(request, sessions)
+    body = await audio.read()
+    if not body:
+        raise HTTPException(status_code=400, detail="audio file is empty")
+
+    parsed_captured_at: datetime | None = None
+    if captured_at:
+        value = captured_at.strip()
+        if value:
+            try:
+                parsed_captured_at = datetime.fromisoformat(
+                    value.replace("Z", "+00:00")
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="captured_at must be ISO-8601 datetime",
+                ) from exc
+    effective_ext = (file_ext or "").strip() or _infer_ext(audio.filename)
+    try:
+        return await service.archive_voice(
+            person_id=user_id,
+            audio_bytes=body,
+            file_ext=effective_ext,
+            tags=tags,
+            emotion=emotion,
+            reference_text=reference_text,
+            stt_text=stt_text,
+            captured_at=parsed_captured_at,
+        )
+    except VoiceArchiveDuplicateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _infer_ext(filename: str | None) -> str:
+    if not filename or "." not in filename:
+        return "wav"
+    return filename.rsplit(".", 1)[1]

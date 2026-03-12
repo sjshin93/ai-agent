@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import '../../routes.dart';
 import '../../services/auth_service.dart';
 import 'services/admin_service.dart';
+import 'services/audio_recorder_service.dart';
 import 'services/config_service.dart';
 import 'services/diary_service.dart';
 import 'services/llm_service.dart';
 import 'services/slack_notification_service.dart';
+import 'services/voice_archive_service.dart';
 import 'services/voice_prompt_service.dart';
 import 'api_test_tab.dart';
 import '../../services/session_service.dart';
@@ -665,16 +667,17 @@ class _ArchiveWorkspaceState extends State<_ArchiveWorkspace> {
   }
 
   String? _voiceCategoryFromLabel(String label) {
-    switch (label) {
-      case 'Archive-Timbre':
-        return 'timbre';
-      case 'Archive-Prosody':
-        return 'prosody';
-      case 'Archive-emotion':
-        return 'emotion';
-      default:
-        return null;
+    final normalized = label.trim().toLowerCase().replaceAll(' ', '');
+    if (normalized.contains('timbre')) {
+      return 'timbre';
     }
+    if (normalized.contains('prosody')) {
+      return 'prosody';
+    }
+    if (normalized.contains('emotion')) {
+      return 'emotion';
+    }
+    return null;
   }
 }
 
@@ -692,11 +695,17 @@ class _ArchiveVoicePane extends StatefulWidget {
 }
 
 class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
-  final _service = const VoicePromptService();
+  final _promptService = const VoicePromptService();
+  final _archiveService = const VoiceArchiveService();
+  final _recorder = createAudioRecorderService();
   bool _isLoading = true;
+  bool _isSaving = false;
   String? _error;
+  String? _statusMessage;
   List<VoicePromptItem> _items = [];
   int _index = 0;
+  RecordedAudio? _lastRecording;
+  DateTime? _capturedAt;
 
   @override
   void initState() {
@@ -705,10 +714,18 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
   }
 
   @override
+  void dispose() {
+    _recorder.dispose();
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant _ArchiveVoicePane oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.category != widget.category) {
       _index = 0;
+      _lastRecording = null;
+      _capturedAt = null;
       _load();
     }
   }
@@ -719,7 +736,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
       _error = null;
     });
     try {
-      final response = await _service.fetchByCategory(widget.category);
+      final response = await _promptService.fetchByCategory(widget.category);
       if (!mounted) {
         return;
       }
@@ -727,6 +744,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
         _items = response.items;
         _isLoading = false;
         _index = 0;
+        _statusMessage = null;
       });
     } catch (e) {
       if (!mounted) {
@@ -739,6 +757,80 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     }
   }
 
+  Future<void> _handleRecordOrSave() async {
+    if (_isSaving) {
+      return;
+    }
+    if (!_recorder.isRecording) {
+      try {
+        await _recorder.start();
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _capturedAt = DateTime.now();
+          _statusMessage = '녹음 중입니다. 저장 버튼을 눌러 업로드하세요.';
+        });
+      } catch (e) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _statusMessage = '녹음을 시작하지 못했습니다: $e');
+      }
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final recorded = await _recorder.stop();
+      if (!mounted) {
+        return;
+      }
+      _lastRecording = recorded;
+      final item = _items[_index];
+      final response = await _archiveService.upload(
+        bytes: recorded.bytes,
+        fileExt: recorded.fileExt,
+        tags: widget.category,
+        emotion: item.emotionLevel,
+        referenceText: item.text,
+        sttText: null,
+        capturedAt: _capturedAt,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusMessage = '저장 완료: ${response.storageKey}';
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _statusMessage = '저장 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _handlePlay() async {
+    final recorded = _lastRecording;
+    if (recorded == null) {
+      setState(() => _statusMessage = '먼저 녹음을 저장해 주세요.');
+      return;
+    }
+    try {
+      await _recorder.play(recorded);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _statusMessage = '재생 실패: $e');
+    }
+  }
+
   void _move(int delta) {
     if (_items.isEmpty) {
       return;
@@ -747,13 +839,10 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     if (next == _index) {
       return;
     }
-    setState(() => _index = next);
-  }
-
-  void _showActionPlaceholder(String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$action 기능은 다음 단계에서 연결됩니다.')),
-    );
+    setState(() {
+      _index = next;
+      _statusMessage = null;
+    });
   }
 
   @override
@@ -860,20 +949,33 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
             children: [
               Expanded(
                 child: BsButton(
-                  onPressed: () => _showActionPlaceholder('녹음'),
-                  label: '녹음',
+                  onPressed: _isSaving ? null : _handleRecordOrSave,
+                  label: _isSaving
+                      ? '저장 중...'
+                      : _recorder.isRecording
+                          ? '저장'
+                          : '녹음',
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: BsButton(
-                  onPressed: () => _showActionPlaceholder('듣기'),
+                  onPressed: _handlePlay,
                   label: '듣기',
                   outline: true,
                 ),
               ),
             ],
           ),
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 12),
+            BsAlert(
+              message: _statusMessage!,
+              variant: _statusMessage!.startsWith('저장 완료')
+                  ? BsVariant.success
+                  : BsVariant.info,
+            ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [

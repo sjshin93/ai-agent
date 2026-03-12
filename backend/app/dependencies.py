@@ -7,6 +7,7 @@ from app.domains.llm.service import LlmService
 from app.domains.slack_notification.client import SlackClient
 from app.domains.slack_notification.service import SlackNotificationService
 from app.domains.ssh.service import SshService
+from app.domains.voice_archive.service import VoiceArchiveService
 from app.domains.voice_prompts.service import VoicePromptService
 from app.core.session_manager import SessionManager
 from app.core.session_state import session_manager
@@ -47,6 +48,14 @@ def get_ssh_service() -> SshService:
 def get_voice_prompt_service() -> VoicePromptService:
     archive_root = Path(settings.archive_root_path).expanduser()
     return VoicePromptService(archive_root=archive_root)
+
+def get_voice_archive_service() -> VoiceArchiveService:
+    archive_root = Path(settings.archive_root_path).expanduser()
+    return VoiceArchiveService(
+        session_manager=get_session_manager(),
+        archive_root=archive_root,
+        public_root=settings.archive_public_path,
+    )
 
 
 def get_session_manager() -> SessionManager:

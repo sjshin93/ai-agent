@@ -746,3 +746,69 @@ class SessionManager:
                 next_action_text,
             )
         return dict(row) if row is not None else {}
+
+    async def voice_archive_exists_sha256(self, sha256: str) -> bool:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            value = await conn.fetchval(
+                """
+                SELECT 1
+                FROM voice_archives
+                WHERE sha256 = $1
+                LIMIT 1
+                """,
+                sha256,
+            )
+        return value is not None
+
+    async def insert_voice_archive(
+        self,
+        *,
+        entry_id: uuid.UUID,
+        person_id: str,
+        file_name: str,
+        file_ext: str,
+        storage_key: str,
+        created_at: datetime,
+        sha256: str,
+        captured_at: datetime | None,
+        tags: str,
+        emotion: str | None,
+        reference_text: str | None,
+        stt_text: str | None,
+    ) -> dict:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO voice_archives (
+                  id,
+                  person_id,
+                  file_name,
+                  file_ext,
+                  storage_key,
+                  created_at,
+                  sha256,
+                  captured_at,
+                  tags,
+                  emotion,
+                  reference_text,
+                  stt_text
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING *
+                """,
+                entry_id,
+                person_id,
+                file_name,
+                file_ext,
+                storage_key,
+                created_at,
+                sha256,
+                captured_at,
+                tags,
+                emotion,
+                reference_text,
+                stt_text,
+            )
+        return dict(row) if row is not None else {}
