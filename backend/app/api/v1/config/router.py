@@ -1,9 +1,11 @@
 import logging
 from json import JSONDecodeError
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.core.config import settings
+from app.core.session_manager import SessionManager
+from app.dependencies import get_session_manager
 from app.domains.config.schemas import (
     AutoLogoutConfigResponse,
     SessionTouchResponse,
@@ -50,15 +52,25 @@ def get_version_config(request: Request):
 
 
 @router.post("/session-touch", response_model=SessionTouchResponse)
-def touch_session(request: Request):
-    # Session TTL refresh is handled by SessionAuthMiddleware.
+async def touch_session(
+    request: Request,
+    sessions: SessionManager = Depends(get_session_manager),
+):
+    session_id = request.cookies.get(settings.session_cookie_name)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    user_id = await sessions.validate_and_touch(session_id)
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Session expired. Please sign in again.",
+        )
     client_ip = request.client.host if request.client else "unknown"
-    user = getattr(request.state, "username", "anonymous")
     logger.info(
         "session.touch",
         extra={
             "event": "session.touch",
-            "user": user,
+            "user": user_id,
             "ip": client_ip,
         },
     )

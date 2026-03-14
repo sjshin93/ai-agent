@@ -19,3 +19,14 @@ class VoiceArchiveResponse(BaseModel):
     emotion: str | None = None
     reference_text: str | None = None
     stt_text: str | None = None
+
+
+class VoiceArchiveCompletionItem(BaseModel):
+    reference_text: str
+    latest_created_at: datetime
+
+
+class VoiceArchiveCompletionResponse(BaseModel):
+    category: str
+    count: int
+    items: list[VoiceArchiveCompletionItem]

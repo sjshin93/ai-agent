@@ -22,6 +22,9 @@ _PUBLIC_PATHS = {
     "/auth/kakao/callback",
     "/config/auto-logout",
     "/config/version",
+    "/config/turnstile",
+    "/config/turnstile-client-log",
+    "/config/session-touch",
 }
 
 

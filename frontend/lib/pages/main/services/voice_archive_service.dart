@@ -7,6 +7,21 @@ import 'package:http/http.dart' as http;
 class VoiceArchiveService {
   const VoiceArchiveService();
 
+  Future<VoiceArchiveCompletionResponse> fetchCompletions({
+    required String category,
+  }) async {
+    final response = await http.get(
+      Uri.parse('/api/archive/voice-completions/$category'),
+    );
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Voice completion fetch failed (${response.statusCode}): ${response.body}',
+      );
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return VoiceArchiveCompletionResponse.fromJson(data);
+  }
+
   Future<VoiceArchiveResponse> upload({
     required Uint8List bytes,
     required String fileExt,
@@ -73,6 +88,62 @@ class VoiceArchiveService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return VoiceArchiveResponse.fromJson(data);
   }
+
+  Future<VoiceArchiveResponse> deleteById(String id) async {
+    final response = await http.delete(
+      Uri.parse('/api/archive/voice/$id'),
+    );
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Voice archive delete failed (${response.statusCode}): ${response.body}',
+      );
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return VoiceArchiveResponse.fromJson(data);
+  }
+}
+
+class VoiceArchiveCompletionResponse {
+  const VoiceArchiveCompletionResponse({
+    required this.category,
+    required this.count,
+    required this.items,
+  });
+
+  factory VoiceArchiveCompletionResponse.fromJson(Map<String, dynamic> json) {
+    final list = (json['items'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(VoiceArchiveCompletionItem.fromJson)
+        .toList();
+    return VoiceArchiveCompletionResponse(
+      category: json['category']?.toString() ?? '',
+      count: (json['count'] as num?)?.toInt() ?? list.length,
+      items: list,
+    );
+  }
+
+  final String category;
+  final int count;
+  final List<VoiceArchiveCompletionItem> items;
+}
+
+class VoiceArchiveCompletionItem {
+  const VoiceArchiveCompletionItem({
+    required this.referenceText,
+    required this.latestCreatedAt,
+  });
+
+  factory VoiceArchiveCompletionItem.fromJson(Map<String, dynamic> json) {
+    return VoiceArchiveCompletionItem(
+      referenceText: json['reference_text']?.toString() ?? '',
+      latestCreatedAt:
+          DateTime.tryParse(json['latest_created_at']?.toString() ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
+  final String referenceText;
+  final DateTime latestCreatedAt;
 }
 
 class VoiceArchiveResponse {

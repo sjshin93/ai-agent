@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.session_auth import SessionAuthMiddleware
 from app.core.session_state import session_manager
 from app.domains.collection.service import load_collection
 
@@ -24,6 +25,7 @@ app = FastAPI(
         {"name": "slack-notification", "description": "Slack message endpoint."},
     ],
 )
+app.add_middleware(SessionAuthMiddleware, session_manager=session_manager)
 app.include_router(api_router)
 _session_cleanup_task: asyncio.Task | None = None
 
