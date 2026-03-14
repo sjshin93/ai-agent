@@ -133,6 +133,8 @@ class _WebAudioRecorderService implements AudioRecorderService {
         stackTrace: stackTrace,
       );
     }
+    // Give the browser a short moment to emit the final dataavailable event.
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     _recorder!.stop();
     return _stopCompleter!.future;
   }
@@ -200,10 +202,10 @@ class _WebAudioRecorderService implements AudioRecorderService {
 
   String _selectMimeType() {
     const preferred = [
-      'audio/wav',
       'audio/webm;codecs=opus',
       'audio/webm',
       'audio/ogg;codecs=opus',
+      'audio/wav',
     ];
     for (final mime in preferred) {
       if (html.MediaRecorder.isTypeSupported(mime)) {
