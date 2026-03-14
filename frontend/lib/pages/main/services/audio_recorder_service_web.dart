@@ -49,6 +49,13 @@ class _WebAudioRecorderService implements AudioRecorderService {
       throw StateError('This browser does not support microphone access.');
     }
     _stream = await mediaDevices.getUserMedia({'audio': true});
+    final tracks = _stream?.getAudioTracks() ?? const <html.MediaStreamTrack>[];
+    for (final track in tracks) {
+      developer.log(
+        'audio track state enabled=${track.enabled} muted=${track.muted} readyState=${track.readyState}',
+        name: 'voice_recorder',
+      );
+    }
     developer.log(
       'microphone stream acquired tracks=${_stream?.getTracks().length ?? 0}',
       name: 'voice_recorder',
@@ -96,7 +103,8 @@ class _WebAudioRecorderService implements AudioRecorderService {
         _cleanupTracks();
       }
     });
-    _recorder!.start();
+    // Emit chunks periodically for better cross-browser reliability.
+    _recorder!.start(250);
     developer.log(
       'recorder started state=${_recorder?.state}',
       name: 'voice_recorder',
@@ -114,6 +122,17 @@ class _WebAudioRecorderService implements AudioRecorderService {
       throw StateError('Recorder is not running.');
     }
     developer.log('stop requested', name: 'voice_recorder');
+    try {
+      _recorder!.requestData();
+    } catch (error, stackTrace) {
+      developer.log(
+        'requestData failed before stop: $error',
+        name: 'voice_recorder',
+        level: 900,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
     _recorder!.stop();
     return _stopCompleter!.future;
   }
