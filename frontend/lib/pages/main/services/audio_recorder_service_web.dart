@@ -84,6 +84,9 @@ class _WebAudioRecorderService implements AudioRecorderService {
     _stopCompleter = Completer<RecordedAudio>();
     _stopSub = _stopEvent.forTarget(_recorder!).listen((_) async {
       try {
+        // Some browsers dispatch the final data chunk right around stop;
+        // wait briefly so pending dataavailable handlers can append chunks.
+        await Future<void>.delayed(const Duration(milliseconds: 120));
         final audio = await _buildAudio();
         developer.log(
           'recording stopped bytes=${audio.bytes.length} mimeType=${audio.mimeType}',
