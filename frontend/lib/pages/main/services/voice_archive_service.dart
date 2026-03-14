@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -15,6 +16,18 @@ class VoiceArchiveService {
     String? sttText,
     DateTime? capturedAt,
   }) async {
+    developer.log(
+      'upload requested bytes=${bytes.length} fileExt=$fileExt tags=$tags capturedAt=${capturedAt?.toUtc().toIso8601String()}',
+      name: 'voice_archive',
+    );
+    if (bytes.isEmpty) {
+      developer.log(
+        'upload blocked: audio bytes are empty',
+        name: 'voice_archive',
+        level: 1000,
+      );
+      throw StateError('Recorded audio is empty before upload.');
+    }
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('/api/archive/voice'),
@@ -44,10 +57,19 @@ class VoiceArchiveService {
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode != 200) {
+      developer.log(
+        'upload failed status=${response.statusCode} body=${response.body}',
+        name: 'voice_archive',
+        level: 1000,
+      );
       throw Exception(
         'Voice archive failed (${response.statusCode}): ${response.body}',
       );
     }
+    developer.log(
+      'upload succeeded status=${response.statusCode}',
+      name: 'voice_archive',
+    );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return VoiceArchiveResponse.fromJson(data);
   }

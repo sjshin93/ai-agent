@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:html' as html;
 import 'dart:typed_data';
 
@@ -29,14 +30,29 @@ class _WebAudioRecorderService implements AudioRecorderService {
     if (isRecording) {
       return;
     }
+    _dataSub?.cancel();
+    _stopSub?.cancel();
     _chunks.clear();
     _mimeType = _selectMimeType();
     _fileExt = _mimeToExt(_mimeType);
+    developer.log(
+      'start requested mimeType=$_mimeType fileExt=$_fileExt',
+      name: 'voice_recorder',
+    );
     final mediaDevices = html.window.navigator.mediaDevices;
     if (mediaDevices == null) {
+      developer.log(
+        'start failed: mediaDevices unavailable',
+        name: 'voice_recorder',
+        level: 1000,
+      );
       throw StateError('This browser does not support microphone access.');
     }
     _stream = await mediaDevices.getUserMedia({'audio': true});
+    developer.log(
+      'microphone stream acquired tracks=${_stream?.getTracks().length ?? 0}',
+      name: 'voice_recorder',
+    );
     _recorder = html.MediaRecorder(
       _stream!,
       {'mimeType': _mimeType},
@@ -46,22 +62,58 @@ class _WebAudioRecorderService implements AudioRecorderService {
       final data = blobEvent.data as html.Blob?;
       if (data != null && data.size > 0) {
         _chunks.add(data);
+        developer.log(
+          'data chunk received size=${data.size} totalChunks=${_chunks.length}',
+          name: 'voice_recorder',
+        );
+      } else {
+        developer.log(
+          'dataavailable event with empty chunk',
+          name: 'voice_recorder',
+          level: 900,
+        );
       }
     });
     _stopCompleter = Completer<RecordedAudio>();
     _stopSub = _stopEvent.forTarget(_recorder!).listen((_) async {
-      final audio = await _buildAudio();
-      _stopCompleter?.complete(audio);
-      _cleanupTracks();
+      try {
+        final audio = await _buildAudio();
+        developer.log(
+          'recording stopped bytes=${audio.bytes.length} mimeType=${audio.mimeType}',
+          name: 'voice_recorder',
+        );
+        _stopCompleter?.complete(audio);
+      } catch (error, stackTrace) {
+        developer.log(
+          'failed to build audio on stop: $error',
+          name: 'voice_recorder',
+          level: 1000,
+          error: error,
+          stackTrace: stackTrace,
+        );
+        _stopCompleter?.completeError(error, stackTrace);
+      } finally {
+        _cleanupTracks();
+      }
     });
     _recorder!.start();
+    developer.log(
+      'recorder started state=${_recorder?.state}',
+      name: 'voice_recorder',
+    );
   }
 
   @override
   Future<RecordedAudio> stop() async {
     if (!isRecording || _recorder == null) {
+      developer.log(
+        'stop requested while recorder is not running',
+        name: 'voice_recorder',
+        level: 1000,
+      );
       throw StateError('Recorder is not running.');
     }
+    developer.log('stop requested', name: 'voice_recorder');
     _recorder!.stop();
     return _stopCompleter!.future;
   }
@@ -79,10 +131,23 @@ class _WebAudioRecorderService implements AudioRecorderService {
 
   Future<RecordedAudio> _buildAudio() async {
     if (_chunks.isEmpty) {
+      developer.log(
+        'no chunks available when building audio',
+        name: 'voice_recorder',
+        level: 1000,
+      );
       throw StateError('No audio data recorded.');
     }
     final blob = html.Blob(_chunks, _mimeType);
     final buffer = await _blobToBytes(blob);
+    if (buffer.isEmpty) {
+      developer.log(
+        'blob converted to empty bytes blobSize=${blob.size} chunks=${_chunks.length}',
+        name: 'voice_recorder',
+        level: 1000,
+      );
+      throw StateError('Recorded audio bytes are empty.');
+    }
     return RecordedAudio(
       bytes: buffer,
       mimeType: _mimeType,
@@ -98,8 +163,14 @@ class _WebAudioRecorderService implements AudioRecorderService {
       final result = reader.result;
       if (result is ByteBuffer) {
         completer.complete(result.asUint8List());
+      } else if (result is Uint8List) {
+        completer.complete(result);
       } else {
-        completer.complete(Uint8List(0));
+        completer.completeError(
+          StateError(
+            'Unexpected FileReader result type: ${result.runtimeType}',
+          ),
+        );
       }
     });
     reader.onError.first.then((_) {

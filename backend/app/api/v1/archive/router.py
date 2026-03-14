@@ -117,6 +117,14 @@ async def archive_voice(
     user_id, _ = await _require_authenticated_session(request, sessions)
     body = await audio.read()
     if not body:
+        logger.warning(
+            "Voice archive rejected: empty audio payload user_id=%s filename=%s content_type=%s content_length=%s tags=%s",
+            user_id,
+            audio.filename,
+            audio.content_type,
+            request.headers.get("content-length"),
+            tags,
+        )
         raise HTTPException(status_code=400, detail="audio file is empty")
 
     parsed_captured_at: datetime | None = None
@@ -128,13 +136,18 @@ async def archive_voice(
                     value.replace("Z", "+00:00")
                 )
             except ValueError as exc:
+                logger.warning(
+                    "Voice archive rejected: invalid captured_at user_id=%s captured_at=%s",
+                    user_id,
+                    captured_at,
+                )
                 raise HTTPException(
                     status_code=400,
                     detail="captured_at must be ISO-8601 datetime",
                 ) from exc
     effective_ext = (file_ext or "").strip() or _infer_ext(audio.filename)
     try:
-        return await service.archive_voice(
+        response = await service.archive_voice(
             person_id=user_id,
             audio_bytes=body,
             file_ext=effective_ext,
@@ -144,7 +157,21 @@ async def archive_voice(
             stt_text=stt_text,
             captured_at=parsed_captured_at,
         )
+        logger.info(
+            "Voice archive stored user_id=%s bytes=%s ext=%s tags=%s storage_key=%s",
+            user_id,
+            len(body),
+            effective_ext,
+            tags,
+            response.storage_key,
+        )
+        return response
     except VoiceArchiveDuplicateError as exc:
+        logger.info(
+            "Voice archive duplicate user_id=%s sha256_conflict tags=%s",
+            user_id,
+            tags,
+        )
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 

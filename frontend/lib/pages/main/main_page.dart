@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -759,10 +760,18 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
 
   Future<void> _handleRecordOrSave() async {
     if (_isSaving) {
+      developer.log(
+        'ignored record/save click while saving',
+        name: 'voice_archive_ui',
+      );
       return;
     }
     if (!_recorder.isRecording) {
       try {
+        developer.log(
+          'record start requested category=${widget.category}',
+          name: 'voice_archive_ui',
+        );
         await _recorder.start();
         if (!mounted) {
           return;
@@ -772,6 +781,11 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
           _statusMessage = '녹음 중입니다. 저장 버튼을 눌러 업로드하세요.';
         });
       } catch (e) {
+        developer.log(
+          'record start failed category=${widget.category}: $e',
+          name: 'voice_archive_ui',
+          level: 1000,
+        );
         if (!mounted) {
           return;
         }
@@ -782,12 +796,35 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
 
     setState(() => _isSaving = true);
     try {
+      developer.log(
+        'record stop requested category=${widget.category}',
+        name: 'voice_archive_ui',
+      );
       final recorded = await _recorder.stop();
       if (!mounted) {
         return;
       }
+      developer.log(
+        'record stop completed bytes=${recorded.bytes.length} mimeType=${recorded.mimeType} fileExt=${recorded.fileExt}',
+        name: 'voice_archive_ui',
+      );
+      if (recorded.bytes.isEmpty) {
+        developer.log(
+          'upload skipped: recorded bytes are empty',
+          name: 'voice_archive_ui',
+          level: 1000,
+        );
+        setState(() {
+          _statusMessage = '저장 실패: 녹음 데이터가 비어 있습니다. 잠시 더 녹음 후 다시 시도해주세요.';
+        });
+        return;
+      }
       _lastRecording = recorded;
       final item = _items[_index];
+      developer.log(
+        'upload start category=${widget.category} promptId=${item.id}',
+        name: 'voice_archive_ui',
+      );
       final response = await _archiveService.upload(
         bytes: recorded.bytes,
         fileExt: recorded.fileExt,
