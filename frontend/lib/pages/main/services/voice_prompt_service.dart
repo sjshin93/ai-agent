@@ -6,8 +6,17 @@ class VoicePromptService {
   const VoicePromptService();
 
   Future<VoicePromptListResponse> fetchByCategory(String category) async {
+    final uri = Uri.parse('/api/archive/voice-prompts/$category').replace(
+      queryParameters: {
+        '_ts': DateTime.now().millisecondsSinceEpoch.toString(),
+      },
+    );
     final response = await http.get(
-      Uri.parse('/api/archive/voice-prompts/$category'),
+      uri,
+      headers: const {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
     );
     if (response.statusCode != 200) {
       throw Exception(

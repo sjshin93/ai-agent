@@ -741,10 +741,11 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
       if (!mounted) {
         return;
       }
+      final targetIndex = _firstUnarchivedIndex(response.items);
       setState(() {
         _items = response.items;
         _isLoading = false;
-        _index = 0;
+        _index = targetIndex;
         _statusMessage = null;
       });
     } catch (e) {
@@ -756,6 +757,15 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
         _error = e.toString();
       });
     }
+  }
+
+  int _firstUnarchivedIndex(List<VoicePromptItem> items) {
+    for (var i = 0; i < items.length; i++) {
+      if (!items[i].isArchived) {
+        return i;
+      }
+    }
+    return 0;
   }
 
   Future<void> _handleRecordOrSave() async {
