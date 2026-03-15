@@ -89,15 +89,25 @@ async def list_voice_prompts(
     service: VoicePromptService = Depends(get_voice_prompt_service),
     sessions: SessionManager = Depends(get_session_manager),
 ) -> VoicePromptListResponse:
-    await _require_authenticated_session(request, sessions)
+    user_id, _ = await _require_authenticated_session(request, sessions)
     try:
         items = service.load(category)
     except VoicePromptLoadError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    archived_reference_texts = await sessions.list_archived_voice_reference_texts(
+        person_id=user_id,
+        tags=category,
+    )
+    enriched_items = [
+        item.model_copy(
+            update={"is_archived": item.text.strip() in archived_reference_texts}
+        )
+        for item in items
+    ]
     return VoicePromptListResponse(
         category=category,
-        count=len(items),
-        items=items,
+        count=len(enriched_items),
+        items=enriched_items,
     )
 
 

@@ -48,6 +48,7 @@ class VoicePromptItem {
     required this.id,
     required this.version,
     required this.type,
+    this.isArchived = false,
     this.emotionLevel,
     this.emotionIntensity,
     required this.direction,
@@ -59,6 +60,7 @@ class VoicePromptItem {
       id: json['id']?.toString() ?? '',
       version: json['version']?.toString() ?? '',
       type: json['type']?.toString() ?? '',
+      isArchived: json['is_archived'] == true,
       emotionLevel: _nullableText(json['emotion_level']),
       emotionIntensity: _nullableText(json['emotion_intensity']),
       direction: json['direction']?.toString() ?? '',
@@ -66,9 +68,25 @@ class VoicePromptItem {
     );
   }
 
+  VoicePromptItem copyWith({
+    bool? isArchived,
+  }) {
+    return VoicePromptItem(
+      id: id,
+      version: version,
+      type: type,
+      isArchived: isArchived ?? this.isArchived,
+      emotionLevel: emotionLevel,
+      emotionIntensity: emotionIntensity,
+      direction: direction,
+      text: text,
+    );
+  }
+
   final String id;
   final String version;
   final String type;
+  final bool isArchived;
   final String? emotionLevel;
   final String? emotionIntensity;
   final String direction;

@@ -761,6 +761,32 @@ class SessionManager:
             )
         return value is not None
 
+    async def list_archived_voice_reference_texts(
+        self,
+        *,
+        person_id: str,
+        tags: str,
+    ) -> set[str]:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT DISTINCT reference_text
+                FROM voice_archives
+                WHERE person_id = $1
+                  AND tags = $2
+                  AND reference_text IS NOT NULL
+                """,
+                person_id,
+                tags,
+            )
+        return {
+            text
+            for row in rows
+            for text in [str(row["reference_text"]).strip()]
+            if text
+        }
+
     async def insert_voice_archive(
         self,
         *,

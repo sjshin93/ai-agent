@@ -11,6 +11,7 @@ class VoicePromptItem(BaseModel):
     id: str
     version: str
     type: str
+    is_archived: bool = False
     emotion_level: str | None = None
     emotion_intensity: str | None = None
     direction: str

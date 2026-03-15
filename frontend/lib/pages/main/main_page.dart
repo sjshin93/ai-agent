@@ -838,6 +838,8 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
         return;
       }
       setState(() {
+        _items = List<VoicePromptItem>.from(_items)
+          ..[_index] = _items[_index].copyWith(isArchived: true);
         _statusMessage = '저장 완료: ${response.storageKey}';
       });
     } catch (e) {
@@ -925,6 +927,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     final hasEmotionMeta = (item.emotionLevel?.isNotEmpty ?? false) ||
         (item.emotionIntensity?.isNotEmpty ?? false);
     final progressLabel = '${_index + 1} / ${_items.length}';
+    final isArchived = item.isArchived;
 
     return BsCard(
       child: Column(
@@ -934,7 +937,22 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               BsText(widget.title, variant: BsTextVariant.subtitle),
-              BsText(progressLabel, variant: BsTextVariant.caption),
+              Row(
+                children: [
+                  BsText(progressLabel, variant: BsTextVariant.caption),
+                  if (isArchived) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF22C55E),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 12),
