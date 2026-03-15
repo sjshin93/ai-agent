@@ -16,6 +16,10 @@ class VoiceArchiveDuplicateError(Exception):
     """Raised when same audio payload already exists globally."""
 
 
+class VoiceArchiveNotFoundError(Exception):
+    """Raised when target voice archive does not exist for the user."""
+
+
 class VoiceArchiveService:
     def __init__(
         self,
@@ -75,6 +79,33 @@ class VoiceArchiveService:
             stt_text=(stt_text or "").strip() or None,
         )
         return VoiceArchiveResponse(**row)
+
+    async def delete_voice_archive(
+        self,
+        *,
+        person_id: str,
+        storage_key: str,
+    ) -> bool:
+        found = await self._session_manager.get_voice_archive_by_storage_key(
+            person_id=person_id,
+            storage_key=storage_key,
+        )
+        if found is None:
+            raise VoiceArchiveNotFoundError("Voice archive not found.")
+
+        file_name = str(found.get("file_name") or "").strip()
+        if file_name:
+            file_path = self._archive_root / person_id / "voice" / "raw" / file_name
+            if file_path.exists():
+                file_path.unlink()
+
+        entry_id = found.get("id")
+        if not isinstance(entry_id, UUID):
+            raise RuntimeError("Invalid archive id")
+        return await self._session_manager.delete_voice_archive_by_id(
+            person_id=person_id,
+            entry_id=entry_id,
+        )
 
     def _normalize_ext(self, ext: str) -> str:
         normalized = (ext or "").strip().lower().lstrip(".")

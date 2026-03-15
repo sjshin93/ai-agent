@@ -19,3 +19,8 @@ class VoiceArchiveResponse(BaseModel):
     emotion: str | None = None
     reference_text: str | None = None
     stt_text: str | None = None
+
+
+class VoiceArchiveDeleteResponse(BaseModel):
+    deleted: bool
+    storage_key: str

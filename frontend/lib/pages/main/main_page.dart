@@ -950,17 +950,17 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
               Row(
                 children: [
                   BsText(progressLabel, variant: BsTextVariant.caption),
-                  if (isArchived) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF22C55E),
-                        shape: BoxShape.circle,
-                      ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isArchived
+                          ? const Color(0xFF22C55E)
+                          : const Color(0xFFEF4444),
+                      shape: BoxShape.circle,
                     ),
-                  ],
+                  ),
                 ],
               ),
             ],

@@ -838,3 +838,46 @@ class SessionManager:
                 stt_text,
             )
         return dict(row) if row is not None else {}
+
+    async def get_voice_archive_by_storage_key(
+        self,
+        *,
+        person_id: str,
+        storage_key: str,
+    ) -> dict | None:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT *
+                FROM voice_archives
+                WHERE person_id = $1
+                  AND storage_key = $2
+                LIMIT 1
+                """,
+                person_id,
+                storage_key,
+            )
+        return dict(row) if row is not None else None
+
+    async def delete_voice_archive_by_id(
+        self,
+        *,
+        person_id: str,
+        entry_id: uuid.UUID,
+    ) -> bool:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                DELETE FROM voice_archives
+                WHERE person_id = $1
+                  AND id = $2
+                """,
+                person_id,
+                entry_id,
+            )
+        try:
+            return int(result.split(" ", 1)[1]) > 0
+        except (IndexError, ValueError):
+            return False

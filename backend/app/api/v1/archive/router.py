@@ -14,9 +14,13 @@ from app.dependencies import (
 )
 from app.domains.diary.schemas import DiaryArchiveRequest, DiaryArchiveResponse
 from app.domains.diary.service import DiaryDuplicateError, DiaryService
-from app.domains.voice_archive.schemas import VoiceArchiveResponse
+from app.domains.voice_archive.schemas import (
+    VoiceArchiveDeleteResponse,
+    VoiceArchiveResponse,
+)
 from app.domains.voice_archive.service import (
     VoiceArchiveDuplicateError,
+    VoiceArchiveNotFoundError,
     VoiceArchiveService,
 )
 from app.domains.voice_prompts.schemas import (
@@ -189,3 +193,27 @@ def _infer_ext(filename: str | None) -> str:
     if not filename or "." not in filename:
         return "wav"
     return filename.rsplit(".", 1)[1]
+
+
+@router.delete("/voice", response_model=VoiceArchiveDeleteResponse)
+async def delete_voice(
+    request: Request,
+    storage_key: str,
+    service: VoiceArchiveService = Depends(get_voice_archive_service),
+    sessions: SessionManager = Depends(get_session_manager),
+) -> VoiceArchiveDeleteResponse:
+    user_id, _ = await _require_authenticated_session(request, sessions)
+    cleaned_storage_key = storage_key.strip()
+    if not cleaned_storage_key:
+        raise HTTPException(status_code=400, detail="storage_key is required")
+    try:
+        deleted = await service.delete_voice_archive(
+            person_id=user_id,
+            storage_key=cleaned_storage_key,
+        )
+        return VoiceArchiveDeleteResponse(
+            deleted=deleted,
+            storage_key=cleaned_storage_key,
+        )
+    except VoiceArchiveNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

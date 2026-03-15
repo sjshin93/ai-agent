@@ -73,6 +73,24 @@ class VoiceArchiveService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return VoiceArchiveResponse.fromJson(data);
   }
+
+  Future<VoiceArchiveDeleteResponse> deleteByStorageKey({
+    required String storageKey,
+  }) async {
+    final uri = Uri.parse('/api/archive/voice').replace(
+      queryParameters: {
+        'storage_key': storageKey,
+      },
+    );
+    final response = await http.delete(uri);
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Voice archive delete failed (${response.statusCode}): ${response.body}',
+      );
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return VoiceArchiveDeleteResponse.fromJson(data);
+  }
 }
 
 class VoiceArchiveResponse {
@@ -109,4 +127,21 @@ class VoiceArchiveResponse {
   final String sha256;
   final DateTime createdAt;
   final DateTime? capturedAt;
+}
+
+class VoiceArchiveDeleteResponse {
+  const VoiceArchiveDeleteResponse({
+    required this.deleted,
+    required this.storageKey,
+  });
+
+  factory VoiceArchiveDeleteResponse.fromJson(Map<String, dynamic> json) {
+    return VoiceArchiveDeleteResponse(
+      deleted: json['deleted'] == true,
+      storageKey: json['storage_key']?.toString() ?? '',
+    );
+  }
+
+  final bool deleted;
+  final String storageKey;
 }
