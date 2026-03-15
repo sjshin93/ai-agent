@@ -701,12 +701,14 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
   final _recorder = createAudioRecorderService();
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isDeleting = false;
   String? _error;
   String? _statusMessage;
   List<VoicePromptItem> _items = [];
   int _index = 0;
   RecordedAudio? _lastRecording;
   DateTime? _capturedAt;
+  String? _lastSavedStorageKey;
 
   @override
   void initState() {
@@ -727,6 +729,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
       _index = 0;
       _lastRecording = null;
       _capturedAt = null;
+      _lastSavedStorageKey = null;
       _load();
     }
   }
@@ -850,6 +853,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
       setState(() {
         _items = List<VoicePromptItem>.from(_items)
           ..[_index] = _items[_index].copyWith(isArchived: true);
+        _lastSavedStorageKey = response.storageKey;
         _statusMessage = '저장 완료: ${response.storageKey}';
       });
     } catch (e) {
@@ -877,6 +881,40 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
         return;
       }
       setState(() => _statusMessage = '재생 실패: $e');
+    }
+  }
+
+  Future<void> _handleDeleteLastSaved() async {
+    final storageKey = _lastSavedStorageKey;
+    if (_isDeleting || storageKey == null || storageKey.isEmpty) {
+      return;
+    }
+    setState(() => _isDeleting = true);
+    try {
+      await _archiveService.deleteByStorageKey(storageKey: storageKey);
+      final refreshed = await _promptService.fetchByCategory(widget.category);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _items = refreshed.items;
+        if (_items.isEmpty) {
+          _index = 0;
+        } else {
+          _index = _index.clamp(0, _items.length - 1);
+        }
+        _lastSavedStorageKey = null;
+        _statusMessage = '삭제 완료: $storageKey';
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _statusMessage = '삭제 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
     }
   }
 
@@ -1027,6 +1065,16 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
                 child: BsButton(
                   onPressed: _handlePlay,
                   label: '듣기',
+                  outline: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: BsButton(
+                  onPressed: (_lastSavedStorageKey != null && !_isDeleting)
+                      ? _handleDeleteLastSaved
+                      : null,
+                  label: _isDeleting ? '삭제 중...' : '삭제',
                   outline: true,
                 ),
               ),
