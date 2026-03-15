@@ -16,10 +16,6 @@ class VoiceArchiveDuplicateError(Exception):
     """Raised when same audio payload already exists globally."""
 
 
-class VoiceArchiveNotFoundError(Exception):
-    """Raised when requested voice archive row does not exist."""
-
-
 class VoiceArchiveService:
     def __init__(
         self,
@@ -78,30 +74,6 @@ class VoiceArchiveService:
             reference_text=(reference_text or "").strip() or None,
             stt_text=(stt_text or "").strip() or None,
         )
-        return VoiceArchiveResponse(**row)
-
-    async def delete_voice_archive(
-        self,
-        *,
-        person_id: str,
-        entry_id: UUID,
-    ) -> VoiceArchiveResponse:
-        row = await self._session_manager.delete_voice_archive(
-            entry_id=entry_id,
-            person_id=person_id,
-        )
-        if not row:
-            raise VoiceArchiveNotFoundError("Voice archive not found.")
-
-        file_name = str(row.get("file_name") or "").strip()
-        if file_name:
-            file_path = self._archive_root / person_id / "voice" / "raw" / file_name
-            try:
-                if file_path.exists():
-                    file_path.unlink()
-            except Exception:
-                # Best effort: DB row was already deleted.
-                pass
         return VoiceArchiveResponse(**row)
 
     def _normalize_ext(self, ext: str) -> str:

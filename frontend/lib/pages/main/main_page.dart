@@ -701,14 +701,11 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
   final _recorder = createAudioRecorderService();
   bool _isLoading = true;
   bool _isSaving = false;
-  bool _isDeleting = false;
   String? _error;
   String? _statusMessage;
   List<VoicePromptItem> _items = [];
-  Set<String> _completedPromptTexts = <String>{};
   int _index = 0;
   RecordedAudio? _lastRecording;
-  String? _lastSavedArchiveId;
   DateTime? _capturedAt;
 
   @override
@@ -729,9 +726,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     if (oldWidget.category != widget.category) {
       _index = 0;
       _lastRecording = null;
-      _lastSavedArchiveId = null;
       _capturedAt = null;
-      _completedPromptTexts = <String>{};
       _load();
     }
   }
@@ -743,33 +738,13 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     });
     try {
       final response = await _promptService.fetchByCategory(widget.category);
-      final completion = await _archiveService.fetchCompletions(
-        category: widget.category,
-      );
-      final completedTexts = completion.items
-          .map((item) => _normalizePromptText(item.referenceText))
-          .where((text) => text.isNotEmpty)
-          .toSet();
-      var nextIndex = 0;
-      for (var i = 0; i < response.items.length; i++) {
-        final normalized = _normalizePromptText(response.items[i].text);
-        if (!completedTexts.contains(normalized)) {
-          nextIndex = i;
-          break;
-        }
-        if (i == response.items.length - 1) {
-          nextIndex = 0;
-        }
-      }
       if (!mounted) {
         return;
       }
       setState(() {
         _items = response.items;
-        _completedPromptTexts = completedTexts;
         _isLoading = false;
-        _index = nextIndex;
-        _lastSavedArchiveId = null;
+        _index = 0;
         _statusMessage = null;
       });
     } catch (e) {
@@ -863,11 +838,6 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
         return;
       }
       setState(() {
-        _completedPromptTexts = {
-          ..._completedPromptTexts,
-          _normalizePromptText(item.text),
-        };
-        _lastSavedArchiveId = response.id;
         _statusMessage = '저장 완료: ${response.storageKey}';
       });
     } catch (e) {
@@ -898,50 +868,6 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     }
   }
 
-  Future<void> _refreshCompletions() async {
-    final completion = await _archiveService.fetchCompletions(
-      category: widget.category,
-    );
-    final completedTexts = completion.items
-        .map((item) => _normalizePromptText(item.referenceText))
-        .where((text) => text.isNotEmpty)
-        .toSet();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _completedPromptTexts = completedTexts;
-    });
-  }
-
-  Future<void> _handleDeleteLastSaved() async {
-    final entryId = _lastSavedArchiveId;
-    if (entryId == null || _isDeleting || _isSaving || _recorder.isRecording) {
-      return;
-    }
-    setState(() => _isDeleting = true);
-    try {
-      final deleted = await _archiveService.deleteById(entryId);
-      await _refreshCompletions();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _lastSavedArchiveId = null;
-        _statusMessage = '삭제 완료: ${deleted.storageKey}';
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _statusMessage = '삭제 실패: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isDeleting = false);
-      }
-    }
-  }
-
   void _move(int delta) {
     if (_items.isEmpty) {
       return;
@@ -955,13 +881,6 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
       _statusMessage = null;
     });
   }
-
-  bool _isCompleted(VoicePromptItem item) {
-    final normalized = _normalizePromptText(item.text);
-    return normalized.isNotEmpty && _completedPromptTexts.contains(normalized);
-  }
-
-  String _normalizePromptText(String value) => value.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -1003,7 +922,6 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     }
 
     final item = _items[_index];
-    final isCompleted = _isCompleted(item);
     final hasEmotionMeta = (item.emotionLevel?.isNotEmpty ?? false) ||
         (item.emotionIntensity?.isNotEmpty ?? false);
     final progressLabel = '${_index + 1} / ${_items.length}';
@@ -1016,17 +934,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               BsText(widget.title, variant: BsTextVariant.subtitle),
-              Row(
-                children: [
-                  if (isCompleted) ...[
-                    const Icon(Icons.check_circle, size: 16, color: Colors.green),
-                    const SizedBox(width: 6),
-                    const BsText('완료', variant: BsTextVariant.caption),
-                    const SizedBox(width: 10),
-                  ],
-                  BsText(progressLabel, variant: BsTextVariant.caption),
-                ],
-              ),
+              BsText(progressLabel, variant: BsTextVariant.caption),
             ],
           ),
           const SizedBox(height: 12),
@@ -1091,19 +999,6 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
                 child: BsButton(
                   onPressed: _handlePlay,
                   label: '듣기',
-                  outline: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: BsButton(
-                  onPressed: (_lastSavedArchiveId != null &&
-                          !_isDeleting &&
-                          !_isSaving &&
-                          !_recorder.isRecording)
-                      ? _handleDeleteLastSaved
-                      : null,
-                  label: _isDeleting ? 'Deleting...' : 'Delete',
                   outline: true,
                 ),
               ),

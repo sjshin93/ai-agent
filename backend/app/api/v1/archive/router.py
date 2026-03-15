@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
 from time import perf_counter
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
@@ -16,13 +15,8 @@ from app.dependencies import (
 from app.domains.diary.schemas import DiaryArchiveRequest, DiaryArchiveResponse
 from app.domains.diary.service import DiaryDuplicateError, DiaryService
 from app.domains.voice_archive.schemas import VoiceArchiveResponse
-from app.domains.voice_archive.schemas import (
-    VoiceArchiveCompletionItem,
-    VoiceArchiveCompletionResponse,
-)
 from app.domains.voice_archive.service import (
     VoiceArchiveDuplicateError,
-    VoiceArchiveNotFoundError,
     VoiceArchiveService,
 )
 from app.domains.voice_prompts.schemas import (
@@ -107,28 +101,6 @@ async def list_voice_prompts(
     )
 
 
-@router.get(
-    "/voice-completions/{category}",
-    response_model=VoiceArchiveCompletionResponse,
-)
-async def list_voice_completions(
-    category: VoicePromptCategory,
-    request: Request,
-    sessions: SessionManager = Depends(get_session_manager),
-) -> VoiceArchiveCompletionResponse:
-    user_id, _ = await _require_authenticated_session(request, sessions)
-    rows = await sessions.list_voice_archive_completions(
-        person_id=user_id,
-        tags=category,
-    )
-    items = [VoiceArchiveCompletionItem(**row) for row in rows]
-    return VoiceArchiveCompletionResponse(
-        category=category,
-        count=len(items),
-        items=items,
-    )
-
-
 @router.post("/voice", response_model=VoiceArchiveResponse)
 async def archive_voice(
     request: Request,
@@ -201,34 +173,6 @@ async def archive_voice(
             tags,
         )
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-
-@router.delete("/voice/{entry_id}", response_model=VoiceArchiveResponse)
-async def delete_voice(
-    entry_id: str,
-    request: Request,
-    service: VoiceArchiveService = Depends(get_voice_archive_service),
-    sessions: SessionManager = Depends(get_session_manager),
-) -> VoiceArchiveResponse:
-    user_id, _ = await _require_authenticated_session(request, sessions)
-    try:
-        parsed_id = UUID(entry_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid voice archive id") from exc
-    try:
-        response = await service.delete_voice_archive(
-            person_id=user_id,
-            entry_id=parsed_id,
-        )
-        logger.info(
-            "Voice archive deleted user_id=%s id=%s storage_key=%s",
-            user_id,
-            response.id,
-            response.storage_key,
-        )
-        return response
-    except VoiceArchiveNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _infer_ext(filename: str | None) -> str:
