@@ -881,3 +881,27 @@ class SessionManager:
             return int(result.split(" ", 1)[1]) > 0
         except (IndexError, ValueError):
             return False
+
+    async def delete_voice_archives_by_tags(
+        self,
+        *,
+        person_id: str,
+        tags: str,
+    ) -> list[dict]:
+        pool, _ = self._require_ready()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                DELETE FROM voice_archives
+                WHERE person_id = $1
+                  AND (
+                    lower(trim(tags)) = lower(trim($2))
+                    OR lower(trim(tags)) = lower('archive-' || trim($2))
+                    OR lower(trim(tags)) LIKE '%' || lower(trim($2)) || '%'
+                  )
+                RETURNING id, file_name, storage_key
+                """,
+                person_id,
+                tags,
+            )
+        return [dict(row) for row in rows]

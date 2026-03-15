@@ -107,6 +107,25 @@ class VoiceArchiveService:
             entry_id=entry_id,
         )
 
+    async def delete_voice_archives_by_tags(
+        self,
+        *,
+        person_id: str,
+        tags: str,
+    ) -> int:
+        deleted_rows = await self._session_manager.delete_voice_archives_by_tags(
+            person_id=person_id,
+            tags=tags,
+        )
+        for row in deleted_rows:
+            file_name = str(row.get("file_name") or "").strip()
+            if not file_name:
+                continue
+            file_path = self._archive_root / person_id / "voice" / "raw" / file_name
+            if file_path.exists():
+                file_path.unlink()
+        return len(deleted_rows)
+
     def _normalize_ext(self, ext: str) -> str:
         normalized = (ext or "").strip().lower().lstrip(".")
         if not normalized:

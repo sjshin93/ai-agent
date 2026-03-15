@@ -91,6 +91,20 @@ class VoiceArchiveService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return VoiceArchiveDeleteResponse.fromJson(data);
   }
+
+  Future<VoiceArchiveBulkDeleteResponse> deleteByCategory({
+    required String category,
+  }) async {
+    final uri = Uri.parse('/api/archive/voice/category/$category');
+    final response = await http.delete(uri);
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Voice archive bulk delete failed (${response.statusCode}): ${response.body}',
+      );
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return VoiceArchiveBulkDeleteResponse.fromJson(data);
+  }
 }
 
 class VoiceArchiveResponse {
@@ -144,4 +158,21 @@ class VoiceArchiveDeleteResponse {
 
   final bool deleted;
   final String storageKey;
+}
+
+class VoiceArchiveBulkDeleteResponse {
+  const VoiceArchiveBulkDeleteResponse({
+    required this.deletedCount,
+    required this.tags,
+  });
+
+  factory VoiceArchiveBulkDeleteResponse.fromJson(Map<String, dynamic> json) {
+    return VoiceArchiveBulkDeleteResponse(
+      deletedCount: (json['deleted_count'] as num?)?.toInt() ?? 0,
+      tags: json['tags']?.toString() ?? '',
+    );
+  }
+
+  final int deletedCount;
+  final String tags;
 }

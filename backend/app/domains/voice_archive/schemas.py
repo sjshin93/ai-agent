@@ -24,3 +24,8 @@ class VoiceArchiveResponse(BaseModel):
 class VoiceArchiveDeleteResponse(BaseModel):
     deleted: bool
     storage_key: str
+
+
+class VoiceArchiveBulkDeleteResponse(BaseModel):
+    deleted_count: int
+    tags: str

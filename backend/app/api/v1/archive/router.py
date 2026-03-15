@@ -15,6 +15,7 @@ from app.dependencies import (
 from app.domains.diary.schemas import DiaryArchiveRequest, DiaryArchiveResponse
 from app.domains.diary.service import DiaryDuplicateError, DiaryService
 from app.domains.voice_archive.schemas import (
+    VoiceArchiveBulkDeleteResponse,
     VoiceArchiveDeleteResponse,
     VoiceArchiveResponse,
 )
@@ -217,3 +218,24 @@ async def delete_voice(
         )
     except VoiceArchiveNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/voice/category/{category}",
+    response_model=VoiceArchiveBulkDeleteResponse,
+)
+async def delete_voice_by_category(
+    category: VoicePromptCategory,
+    request: Request,
+    service: VoiceArchiveService = Depends(get_voice_archive_service),
+    sessions: SessionManager = Depends(get_session_manager),
+) -> VoiceArchiveBulkDeleteResponse:
+    user_id, _ = await _require_authenticated_session(request, sessions)
+    deleted_count = await service.delete_voice_archives_by_tags(
+        person_id=user_id,
+        tags=category,
+    )
+    return VoiceArchiveBulkDeleteResponse(
+        deleted_count=deleted_count,
+        tags=category,
+    )

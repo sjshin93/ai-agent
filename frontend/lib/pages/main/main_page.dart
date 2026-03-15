@@ -702,6 +702,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isDeleting = false;
+  bool _isBulkDeleting = false;
   String? _error;
   String? _statusMessage;
   List<VoicePromptItem> _items = [];
@@ -918,6 +919,58 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
     }
   }
 
+  Future<void> _handleDeleteAllByCategory() async {
+    if (_isBulkDeleting) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('전체 삭제'),
+        content: const Text('전체 삭제를 하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('아니오'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('예'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _isBulkDeleting = true);
+    try {
+      final result = await _archiveService.deleteByCategory(
+        category: widget.category,
+      );
+      final refreshed = await _promptService.fetchByCategory(widget.category);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _items = refreshed.items;
+        _index = _firstUnarchivedIndex(_items);
+        _lastSavedStorageKey = null;
+        _statusMessage = '전체 삭제 완료: ${result.deletedCount}건';
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _statusMessage = '전체 삭제 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isBulkDeleting = false);
+      }
+    }
+  }
+
   void _move(int delta) {
     if (_items.isEmpty) {
       return;
@@ -1003,6 +1056,18 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: 140,
+              child: BsButton(
+                onPressed: _isBulkDeleting ? null : _handleDeleteAllByCategory,
+                label: _isBulkDeleting ? '전체 삭제 중...' : '전체 삭제',
+                outline: true,
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
@@ -1052,7 +1117,9 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
             children: [
               Expanded(
                 child: BsButton(
-                  onPressed: _isSaving ? null : _handleRecordOrSave,
+                  onPressed: (_isSaving || _isBulkDeleting)
+                      ? null
+                      : _handleRecordOrSave,
                   label: _isSaving
                       ? '저장 중...'
                       : _recorder.isRecording
@@ -1063,7 +1130,7 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
               const SizedBox(width: 8),
               Expanded(
                 child: BsButton(
-                  onPressed: _handlePlay,
+                  onPressed: _isBulkDeleting ? null : _handlePlay,
                   label: '듣기',
                   outline: true,
                 ),
@@ -1071,7 +1138,10 @@ class _ArchiveVoicePaneState extends State<_ArchiveVoicePane> {
               const SizedBox(width: 8),
               Expanded(
                 child: BsButton(
-                  onPressed: (_lastSavedStorageKey != null && !_isDeleting)
+                  onPressed:
+                      (_lastSavedStorageKey != null &&
+                              !_isDeleting &&
+                              !_isBulkDeleting)
                       ? _handleDeleteLastSaved
                       : null,
                   label: _isDeleting ? '삭제 중...' : '삭제',
